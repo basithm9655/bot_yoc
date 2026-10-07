@@ -340,6 +340,131 @@ function onUserEditYear(val) {
   }
 }
 
+let rollCheckDebounceTimer = null;
+let isCurrentRollDuplicate = false;
+
+// Check if a roll number is already registered in the system (Supabase)
+async function checkRollUniquenessRemote(rollNo) {
+  if (!rollNo || rollNo.length < 3) return { registered: false };
+  if (!STATE.isConfigured && !initSupabase()) return { registered: false };
+
+  const cleanRoll = rollNo.trim().toUpperCase();
+
+  // 1. Try dedicated RPC function (fastest & security definer)
+  try {
+    const { data: rpcData, error: rpcErr } = await STATE.supabase.rpc('check_roll_registered', { p_roll_no: cleanRoll });
+    if (!rpcErr && rpcData) {
+      if (typeof rpcData === 'object' && rpcData.registered === true) {
+        return { registered: true, details: rpcData };
+      } else if (rpcData === true) {
+        return { registered: true, details: { roll_no: cleanRoll } };
+      }
+    }
+  } catch (e) {}
+
+  // 2. Direct profiles query fallback
+  try {
+    const { data, error } = await STATE.supabase
+      .from('profiles')
+      .select('id, name, roll_no, department, batch_year')
+      .ilike('roll_no', cleanRoll)
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      return { registered: true, details: data[0] };
+    }
+  } catch (e) {}
+
+  // 3. Fallback: Check via get_login_email RPC
+  try {
+    const { data: emailData, error: emailErr } = await STATE.supabase.rpc('get_login_email', { p_identifier: cleanRoll });
+    if (!emailErr && emailData) {
+      const synthetic = (cleanRoll.toLowerCase().replace(/[^a-z0-9]/g, '') + '@attendance.local');
+      if (emailData.toLowerCase() !== synthetic) {
+        return { registered: true, details: { roll_no: cleanRoll, email: emailData } };
+      }
+    }
+  } catch (e) {}
+
+  return { registered: false };
+}
+
+function openDuplicateRollModal(specificRoll = '') {
+  const rollInput = document.getElementById('signupRoll');
+  const rollNo = (specificRoll || (rollInput ? rollInput.value : '') || '25U201').trim().toUpperCase();
+  const modal = document.getElementById('duplicateRollModal');
+  const modalRollElem = document.getElementById('dupModalRollNo');
+  const callBtn = document.getElementById('dupModalCallAdminBtn');
+  const adminPhone = (window.getAdminContactPhone ? window.getAdminContactPhone() : '+919876543210');
+
+  if (modalRollElem) modalRollElem.textContent = rollNo;
+  if (callBtn) {
+    callBtn.href = `tel:${adminPhone.replace(/\s+/g, '')}`;
+  }
+
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeDuplicateRollModal() {
+  const modal = document.getElementById('duplicateRollModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+function copyAdminDeleteRequest() {
+  const rollInput = document.getElementById('signupRoll');
+  const rollNo = (rollInput ? rollInput.value : '').trim().toUpperCase() || 'this roll number';
+  const text = `Hello Club Admin, my roll number is ${rollNo}. Please delete my previous account in the Manavar Illam Attendance App so I can register fresh. Thank you!`;
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      const btnText = document.getElementById('dupModalCopyText');
+      if (btnText) {
+        const orig = btnText.textContent;
+        btnText.textContent = "✓ Message Copied!";
+        setTimeout(() => { btnText.textContent = orig; }, 2500);
+      }
+      showToast("✓ Copied request message to clipboard");
+    }).catch(() => {
+      fallbackCopyText(text);
+    });
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast("✓ Copied request message to clipboard");
+  } catch (e) {
+    showToast("Please message your admin with roll no: " + text);
+  }
+}
+
+function goToLoginWithDuplicateRoll() {
+  closeDuplicateRollModal();
+  const rollInput = document.getElementById('signupRoll');
+  const rollNo = (rollInput ? rollInput.value : '').trim().toUpperCase();
+  showScreen('login');
+  const loginInput = document.getElementById('loginIdentifier');
+  if (loginInput && rollNo) {
+    loginInput.value = rollNo;
+    const loginPwd = document.getElementById('loginPassword');
+    if (loginPwd) loginPwd.focus();
+  }
+}
+
 function handleRollInput(val) {
   const rollInput = document.getElementById('signupRoll');
   const deptInput = document.getElementById('signupDept');
@@ -348,8 +473,13 @@ function handleRollInput(val) {
   const checkIcon = document.getElementById('rollDetectCheck');
   const badgeDept = document.getElementById('rollDetectedDept');
   const badgeYear = document.getElementById('rollDetectedYear');
+  const dupNotice = document.getElementById('duplicateRollInlineNotice');
+  const dupInlineRollText = document.getElementById('dupInlineRollText');
 
   if (!val) {
+    isCurrentRollDuplicate = false;
+    if (dupNotice) dupNotice.classList.add('hidden');
+    if (rollInput) rollInput.classList.remove('border-amber-500');
     if (autoBadge && !userEditedDeptManually) autoBadge.classList.add('hidden');
     if (checkIcon) checkIcon.classList.add('hidden');
     return;
@@ -373,7 +503,7 @@ function handleRollInput(val) {
     if (badgeDept) badgeDept.textContent = deptInput ? deptInput.value : parsed.deptName;
     if (badgeYear) badgeYear.textContent = `${yearInput ? yearInput.value : parsed.year} Batch`;
     if (autoBadge) autoBadge.classList.remove('hidden');
-    if (checkIcon) checkIcon.classList.remove('hidden');
+    if (checkIcon && !isCurrentRollDuplicate) checkIcon.classList.remove('hidden');
   } else {
     if (checkIcon) checkIcon.classList.add('hidden');
     // If user has custom department/year, keep badge visible with their custom values
@@ -385,6 +515,30 @@ function handleRollInput(val) {
       if (autoBadge) autoBadge.classList.add('hidden');
     }
   }
+
+  // Live debounced check to verify this roll number isn't already registered
+  clearTimeout(rollCheckDebounceTimer);
+  rollCheckDebounceTimer = setTimeout(async () => {
+    if (clean.length >= 4) {
+      const check = await checkRollUniquenessRemote(clean);
+      if (check.registered) {
+        isCurrentRollDuplicate = true;
+        if (dupNotice) dupNotice.classList.remove('hidden');
+        if (dupInlineRollText) dupInlineRollText.textContent = clean;
+        if (rollInput) rollInput.classList.add('border-amber-500');
+        if (checkIcon) checkIcon.classList.add('hidden');
+      } else {
+        isCurrentRollDuplicate = false;
+        if (dupNotice) dupNotice.classList.add('hidden');
+        if (rollInput) rollInput.classList.remove('border-amber-500');
+        if (parsed && parsed.deptName && checkIcon) checkIcon.classList.remove('hidden');
+      }
+    } else {
+      isCurrentRollDuplicate = false;
+      if (dupNotice) dupNotice.classList.add('hidden');
+      if (rollInput) rollInput.classList.remove('border-amber-500');
+    }
+  }, 350);
 }
 
 function hideSplashScreen() {
@@ -945,6 +1099,31 @@ async function handleSignup() {
 
   if (signupBtn) {
     signupBtn.disabled = true;
+    signupBtn.textContent = "Verifying Roll No...";
+  }
+
+  // Pre-check: Enforce one-time registration per roll number
+  const uniquenessCheck = await checkRollUniquenessRemote(rollNo);
+  if (uniquenessCheck.registered) {
+    if (signupBtn) {
+      signupBtn.disabled = false;
+      signupBtn.textContent = "Register Account";
+    }
+    showToast("⚠️ Roll number " + rollNo + " is already registered!");
+    openDuplicateRollModal(rollNo);
+    const dupNotice = document.getElementById('duplicateRollInlineNotice');
+    if (dupNotice) dupNotice.classList.remove('hidden');
+    const dupInlineRollText = document.getElementById('dupInlineRollText');
+    if (dupInlineRollText) dupInlineRollText.textContent = rollNo;
+    const rInput = document.getElementById('signupRoll');
+    if (rInput) {
+      rInput.focus();
+      rInput.classList.add('border-amber-500');
+    }
+    return;
+  }
+
+  if (signupBtn) {
     signupBtn.textContent = "Creating Account...";
   }
 
@@ -965,7 +1144,13 @@ async function handleSignup() {
     });
 
     if (error) {
-      showToast(error.message);
+      const errMsg = (error.message || '').toLowerCase();
+      if (errMsg.includes('already registered') || errMsg.includes('unique') || errMsg.includes('duplicate')) {
+        showToast("⚠️ This roll number is already registered!");
+        openDuplicateRollModal(rollNo);
+      } else {
+        showToast(error.message);
+      }
       return;
     }
 
@@ -990,11 +1175,17 @@ async function handleSignup() {
     }
   } catch (err) {
     console.error("Signup error:", err);
-    showToast(err.message || "Failed to create account");
+    const msg = (err.message || '').toLowerCase();
+    if (msg.includes('already registered') || msg.includes('unique') || msg.includes('duplicate')) {
+      showToast("⚠️ This roll number is already registered!");
+      openDuplicateRollModal(rollNo);
+    } else {
+      showToast(err.message || "Failed to create account");
+    }
   } finally {
     if (signupBtn) {
       signupBtn.disabled = false;
-      signupBtn.textContent = "Continue";
+      signupBtn.textContent = "Register Account";
     }
   }
 }
@@ -2128,12 +2319,8 @@ function setupPwa() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     STATE.pwaInstallPrompt = e;
-    console.log('✓ Chrome beforeinstallprompt detected: PWA installable');
-    const banner = document.getElementById('pwaBanner');
-    const isDismissed = sessionStorage.getItem('PWA_BANNER_DISMISSED') === '1';
-    if (banner && !isDismissed) {
-      banner.classList.remove('hidden');
-    }
+    console.log('✓ Chrome beforeinstallprompt detected: PWA installable (running in browser mode)');
+    // Banner is kept hidden by default so users can use the app directly in their mobile browser without install
   });
 
   // Handle Chrome appinstalled event

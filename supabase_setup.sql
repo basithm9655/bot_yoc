@@ -110,6 +110,43 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.get_login_email(TEXT) TO anon, authenticated;
 
+-- 6c. HELPER FUNCTION: Check if roll number is already registered (bypasses RLS for registration check)
+CREATE OR REPLACE FUNCTION public.check_roll_registered(p_roll_no TEXT)
+RETURNS JSONB AS $$
+DECLARE
+  v_rec RECORD;
+BEGIN
+  IF p_roll_no IS NULL OR TRIM(p_roll_no) = '' THEN
+    RETURN jsonb_build_object('registered', false);
+  END IF;
+
+  SELECT id, name, roll_no, department, batch_year
+  INTO v_rec
+  FROM public.profiles
+  WHERE LOWER(TRIM(roll_no)) = LOWER(TRIM(p_roll_no))
+  LIMIT 1;
+
+  IF FOUND THEN
+    RETURN jsonb_build_object(
+      'registered', true,
+      'name', v_rec.name,
+      'roll_no', v_rec.roll_no,
+      'department', v_rec.department,
+      'batch_year', v_rec.batch_year
+    );
+  ELSE
+    RETURN jsonb_build_object('registered', false);
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.check_roll_registered(TEXT) TO anon, authenticated;
+
+-- Enforce one-time registration per roll number with a partial unique index
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_unique_roll_no 
+  ON public.profiles (LOWER(TRIM(roll_no))) 
+  WHERE roll_no IS NOT NULL AND TRIM(roll_no) <> '';
+
 -- 7. TRIGGER: Handle new user registration on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -138,6 +175,13 @@ BEGIN
   user_roll := COALESCE(NEW.raw_user_meta_data->>'roll_no', '');
   user_dept := COALESCE(NEW.raw_user_meta_data->>'department', '');
   user_year := COALESCE(NEW.raw_user_meta_data->>'batch_year', '');
+
+  -- Enforce one-time registration per roll number
+  IF user_roll IS NOT NULL AND TRIM(user_roll) <> '' THEN
+    IF EXISTS (SELECT 1 FROM public.profiles WHERE LOWER(TRIM(roll_no)) = LOWER(TRIM(user_roll)) AND id <> NEW.id) THEN
+      RAISE EXCEPTION 'Roll number % is already registered. Please call club admin to delete the old record.', user_roll;
+    END IF;
+  END IF;
 
   -- Insert profile
   INSERT INTO public.profiles (id, name, identifier, roll_no, department, batch_year, role, approval_status, created_at)
