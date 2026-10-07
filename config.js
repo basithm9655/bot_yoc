@@ -4,13 +4,7 @@
 window.APP_CONFIG = {
   // Live Supabase Project Credentials
   SUPABASE_URL: "https://itsgtoippjfkvspooodb.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0c2d0b2lwcGpma3ZzcG9vb2RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzOTg0ODAsImV4cCI6MjEwNjk3NDQ4MH0.NbxIoBeBizj3uobMgbRjrGvi3EAhvMEtcwIVWg8cJBk",
-  // Club Admin Hotline (for account deletion, reset & support)
-  ADMIN_CONTACT_PHONE: "+919876543210"
-};
-
-window.getAdminContactPhone = function() {
-  return window.APP_CONFIG.ADMIN_CONTACT_PHONE || '+919876543210';
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0c2d0b2lwcGpma3ZzcG9vb2RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzOTg0ODAsImV4cCI6MjEwNjk3NDQ4MH0.NbxIoBeBizj3uobMgbRjrGvi3EAhvMEtcwIVWg8cJBk"
 };
 
 

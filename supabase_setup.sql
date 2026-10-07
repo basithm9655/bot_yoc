@@ -179,7 +179,7 @@ BEGIN
   -- Enforce one-time registration per roll number
   IF user_roll IS NOT NULL AND TRIM(user_roll) <> '' THEN
     IF EXISTS (SELECT 1 FROM public.profiles WHERE LOWER(TRIM(roll_no)) = LOWER(TRIM(user_roll)) AND id <> NEW.id) THEN
-      RAISE EXCEPTION 'Roll number % is already registered. Please call club admin to delete the old record.', user_roll;
+      RAISE EXCEPTION 'Roll number % is already registered. Please sign in to your existing account.', user_roll;
     END IF;
   END IF;
 

@@ -389,81 +389,6 @@ async function checkRollUniquenessRemote(rollNo) {
   return { registered: false };
 }
 
-function openDuplicateRollModal(specificRoll = '') {
-  const rollInput = document.getElementById('signupRoll');
-  const rollNo = (specificRoll || (rollInput ? rollInput.value : '') || '25U201').trim().toUpperCase();
-  const modal = document.getElementById('duplicateRollModal');
-  const modalRollElem = document.getElementById('dupModalRollNo');
-  const callBtn = document.getElementById('dupModalCallAdminBtn');
-  const adminPhone = (window.getAdminContactPhone ? window.getAdminContactPhone() : '+919876543210');
-
-  if (modalRollElem) modalRollElem.textContent = rollNo;
-  if (callBtn) {
-    callBtn.href = `tel:${adminPhone.replace(/\s+/g, '')}`;
-  }
-
-  if (modal) {
-    modal.classList.remove('hidden');
-  }
-}
-
-function closeDuplicateRollModal() {
-  const modal = document.getElementById('duplicateRollModal');
-  if (modal) {
-    modal.classList.add('hidden');
-  }
-}
-
-function copyAdminDeleteRequest() {
-  const rollInput = document.getElementById('signupRoll');
-  const rollNo = (rollInput ? rollInput.value : '').trim().toUpperCase() || 'this roll number';
-  const text = `Hello Club Admin, my roll number is ${rollNo}. Please delete my previous account in the Manavar Illam Attendance App so I can register fresh. Thank you!`;
-  
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      const btnText = document.getElementById('dupModalCopyText');
-      if (btnText) {
-        const orig = btnText.textContent;
-        btnText.textContent = "✓ Message Copied!";
-        setTimeout(() => { btnText.textContent = orig; }, 2500);
-      }
-      showToast("✓ Copied request message to clipboard");
-    }).catch(() => {
-      fallbackCopyText(text);
-    });
-  } else {
-    fallbackCopyText(text);
-  }
-}
-
-function fallbackCopyText(text) {
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast("✓ Copied request message to clipboard");
-  } catch (e) {
-    showToast("Please message your admin with roll no: " + text);
-  }
-}
-
-function goToLoginWithDuplicateRoll() {
-  closeDuplicateRollModal();
-  const rollInput = document.getElementById('signupRoll');
-  const rollNo = (rollInput ? rollInput.value : '').trim().toUpperCase();
-  showScreen('login');
-  const loginInput = document.getElementById('loginIdentifier');
-  if (loginInput && rollNo) {
-    loginInput.value = rollNo;
-    const loginPwd = document.getElementById('loginPassword');
-    if (loginPwd) loginPwd.focus();
-  }
-}
 
 function handleRollInput(val) {
   const rollInput = document.getElementById('signupRoll');
@@ -1109,8 +1034,7 @@ async function handleSignup() {
       signupBtn.disabled = false;
       signupBtn.textContent = "Register Account";
     }
-    showToast("⚠️ Roll number " + rollNo + " is already registered!");
-    openDuplicateRollModal(rollNo);
+    showToast("⚠️ Roll number " + rollNo + " is already registered! Please sign in.");
     const dupNotice = document.getElementById('duplicateRollInlineNotice');
     if (dupNotice) dupNotice.classList.remove('hidden');
     const dupInlineRollText = document.getElementById('dupInlineRollText');
@@ -1146,8 +1070,9 @@ async function handleSignup() {
     if (error) {
       const errMsg = (error.message || '').toLowerCase();
       if (errMsg.includes('already registered') || errMsg.includes('unique') || errMsg.includes('duplicate')) {
-        showToast("⚠️ This roll number is already registered!");
-        openDuplicateRollModal(rollNo);
+        showToast("⚠️ Roll number " + rollNo + " is already registered! Please sign in.");
+        const dupNotice = document.getElementById('duplicateRollInlineNotice');
+        if (dupNotice) dupNotice.classList.remove('hidden');
       } else {
         showToast(error.message);
       }
@@ -1177,8 +1102,9 @@ async function handleSignup() {
     console.error("Signup error:", err);
     const msg = (err.message || '').toLowerCase();
     if (msg.includes('already registered') || msg.includes('unique') || msg.includes('duplicate')) {
-      showToast("⚠️ This roll number is already registered!");
-      openDuplicateRollModal(rollNo);
+      showToast("⚠️ Roll number " + rollNo + " is already registered! Please sign in.");
+      const dupNotice = document.getElementById('duplicateRollInlineNotice');
+      if (dupNotice) dupNotice.classList.remove('hidden');
     } else {
       showToast(err.message || "Failed to create account");
     }
