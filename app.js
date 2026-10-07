@@ -2128,14 +2128,29 @@ function setupPwa() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     STATE.pwaInstallPrompt = e;
+    console.log('✓ Chrome beforeinstallprompt detected: PWA installable');
     const banner = document.getElementById('pwaBanner');
-    if (banner) banner.classList.remove('hidden');
+    const isDismissed = sessionStorage.getItem('PWA_BANNER_DISMISSED') === '1';
+    if (banner && !isDismissed) {
+      banner.classList.remove('hidden');
+    }
   });
 
-  // Check if standalone (already installed)
+  // Handle Chrome appinstalled event
+  window.addEventListener('appinstalled', (evt) => {
+    console.log('✓ Manavar Illam PWA successfully installed in Chrome/OS');
+    STATE.pwaInstallPrompt = null;
+    dismissPwaBanner();
+    showToast("✓ App installed to Home Screen");
+  });
+
+  // Check if standalone (already installed or running inside PWA wrapper)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
   if (isStandalone) {
     dismissPwaBanner();
+  } else if (sessionStorage.getItem('PWA_BANNER_DISMISSED') === '1') {
+    const banner = document.getElementById('pwaBanner');
+    if (banner) banner.classList.add('hidden');
   }
 }
 
@@ -2150,17 +2165,21 @@ function handleInstallPwa() {
       STATE.pwaInstallPrompt = null;
     });
   } else {
-    // iOS Safari or unsupported browser instructions
+    // Chrome Desktop, Android, or iOS fallback
     const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    const isChrome = /chrome|crios/.test(navigator.userAgent.toLowerCase()) && !/edge|edg/.test(navigator.userAgent.toLowerCase());
     if (isIos) {
       alert("To install on iPhone:\n1. Tap the Share button (square with arrow ↑) at the bottom.\n2. Scroll down and tap 'Add to Home Screen'.");
+    } else if (isChrome) {
+      showToast("Tap Chrome ⋮ menu and select 'Install app' or 'Add to Home screen'");
     } else {
-      showToast("Use your browser's menu to 'Add to Home Screen'");
+      showToast("Use your browser menu to 'Install app' or 'Add to Home screen'");
     }
   }
 }
 
 function dismissPwaBanner() {
+  sessionStorage.setItem('PWA_BANNER_DISMISSED', '1');
   const banner = document.getElementById('pwaBanner');
   if (!banner) return;
   banner.style.opacity = '0';
