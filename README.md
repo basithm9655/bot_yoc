@@ -45,9 +45,14 @@ A sleek, dark-mode, sapphire-glass daily club attendance PWA designed for mobile
   - **Interactive Companion Ghost**: Floating mini mascot in the header that switches to celebratory dance (`ghost-celebrate`) when attendance is logged. Tap/poke the mascot for encouraging club toasts!
   - **Staggered Smooth Entrance Transitions**: Header (`anim-stagger-1`), action orb (`anim-stagger-2`), and summary card (`anim-stagger-3`) rise smoothly into place.
   - **Fluid Circular Progress Bar**: Smooth vector stroke transition (`stroke-dashoffset`) showing attendance percentage.
+- **Live Real-Time Password & Confirm Verification**:
+  - Instant live validation as users type on mobile with dynamic status indicator pill.
+  - Interactive eye toggle buttons to reveal and verify passwords.
+  - Length meter (`Password needs at least 6 characters`) and match indicator (`✓ Passwords match`).
+  - Active color-coded focus rings (emerald on match, rose on mismatch).
 - **PWA Capabilities**:
   - Installable on Android, Chrome, and iOS (iPhone Safari).
-  - Service Worker cache (`manavar-illam-pwa-v6`) for instant loading and offline support.
+  - Service Worker cache (`manavar-illam-pwa-v7`) for instant loading and offline support.
 
 ---
 

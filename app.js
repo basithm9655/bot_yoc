@@ -516,6 +516,13 @@ function showScreen(screenId) {
           el.style.animation = '';
         }
       });
+    } else if (screenId === 'signup') {
+      const matchBox = document.getElementById('passwordMatchStatus');
+      if (matchBox) matchBox.classList.add('hidden');
+      const p1 = document.getElementById('signupPassword');
+      const p2 = document.getElementById('signupConfirm');
+      if (p1) p1.classList.remove('border-emerald-500', 'border-rose-500', 'border-amber-500');
+      if (p2) p2.classList.remove('border-emerald-500', 'border-rose-500');
     }
   }
 
@@ -841,6 +848,59 @@ function togglePasswordVisibility(inputId, btn) {
   }
 }
 
+function checkPasswordMatch() {
+  const p1Elem = document.getElementById('signupPassword');
+  const p2Elem = document.getElementById('signupConfirm');
+  const statusBox = document.getElementById('passwordMatchStatus');
+  const statusIcon = document.getElementById('passwordMatchIcon');
+  const statusText = document.getElementById('passwordMatchText');
+  if (!p1Elem || !p2Elem || !statusBox || !statusIcon || !statusText) return;
+
+  const p1 = p1Elem.value;
+  const p2 = p2Elem.value;
+
+  if (!p1 && !p2) {
+    statusBox.classList.add('hidden');
+    p1Elem.classList.remove('border-emerald-500', 'border-rose-500', 'border-amber-500');
+    p2Elem.classList.remove('border-emerald-500', 'border-rose-500');
+    return;
+  }
+
+  statusBox.classList.remove('hidden');
+
+  if (p1.length > 0 && p1.length < 6) {
+    statusBox.className = "px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 bg-amber-500/10 text-amber-300 border border-amber-500/25";
+    statusIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>`;
+    statusText.textContent = `Password needs at least 6 characters (${p1.length}/6)`;
+    p1Elem.classList.add('border-amber-500');
+    p1Elem.classList.remove('border-emerald-500');
+    return;
+  } else if (p1.length >= 6) {
+    p1Elem.classList.remove('border-amber-500');
+  }
+
+  if (p2.length > 0) {
+    if (p1 === p2) {
+      statusBox.className = "px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25";
+      statusIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>`;
+      statusText.textContent = "✓ Passwords match";
+      p2Elem.classList.remove('border-rose-500');
+      p2Elem.classList.add('border-emerald-500');
+    } else {
+      statusBox.className = "px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/25";
+      statusIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`;
+      statusText.textContent = "Passwords do not match";
+      p2Elem.classList.remove('border-emerald-500');
+      p2Elem.classList.add('border-rose-500');
+    }
+  } else {
+    statusBox.className = "px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 bg-white/[0.05] text-white/60 border border-white/10";
+    statusIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+    statusText.textContent = "Re-enter password in Confirm to verify";
+    p2Elem.classList.remove('border-emerald-500', 'border-rose-500');
+  }
+}
+
 async function handleSignup() {
   if (!STATE.isConfigured && !initSupabase()) {
     showToast("Connecting to service, please try again...");
@@ -863,11 +923,23 @@ async function handleSignup() {
 
   if (password.length < 6) {
     showToast("Password must be at least 6 characters");
+    const p1 = document.getElementById('signupPassword');
+    if (p1) {
+      p1.focus();
+      p1.classList.add('border-amber-500');
+    }
+    checkPasswordMatch();
     return;
   }
 
   if (password !== confirmPassword) {
-    showToast("Passwords do not match");
+    showToast("Passwords do not match. Please verify.");
+    const p2 = document.getElementById('signupConfirm');
+    if (p2) {
+      p2.focus();
+      p2.classList.add('border-rose-500');
+    }
+    checkPasswordMatch();
     return;
   }
 

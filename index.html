@@ -728,29 +728,67 @@
               >
             </div>
 
-            <!-- Password & Confirm -->
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Password</label>
-                <input 
-                  id="signupPassword" 
-                  type="password" 
-                  required 
-                  autocomplete="new-password"
-                  placeholder="••••••••" 
-                  class="w-full px-3.5 py-2.5 zentra-card rounded-2xl text-white text-base font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
-                >
+            <!-- Password & Confirm with Live Match Verification & Reveal -->
+            <div class="space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Password</label>
+                  <div class="relative">
+                    <input 
+                      id="signupPassword" 
+                      type="password" 
+                      required 
+                      autocomplete="new-password"
+                      placeholder="••••••••" 
+                      oninput="checkPasswordMatch()"
+                      class="w-full pl-3 pr-8 py-2.5 zentra-card rounded-2xl text-white text-base font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+                    >
+                    <button 
+                      type="button" 
+                      onclick="togglePasswordVisibility('signupPassword', this)" 
+                      class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-white/40 hover:text-white transition"
+                      tabindex="-1"
+                      title="Toggle password visibility"
+                    >
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Confirm</label>
+                  <div class="relative">
+                    <input 
+                      id="signupConfirm" 
+                      type="password" 
+                      required 
+                      autocomplete="new-password"
+                      placeholder="••••••••" 
+                      oninput="checkPasswordMatch()"
+                      class="w-full pl-3 pr-8 py-2.5 zentra-card rounded-2xl text-white text-base font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+                    >
+                    <button 
+                      type="button" 
+                      onclick="togglePasswordVisibility('signupConfirm', this)" 
+                      class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-white/40 hover:text-white transition"
+                      tabindex="-1"
+                      title="Toggle password visibility"
+                    >
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Confirm</label>
-                <input 
-                  id="signupConfirm" 
-                  type="password" 
-                  required 
-                  autocomplete="new-password"
-                  placeholder="••••••••" 
-                  class="w-full px-3.5 py-2.5 zentra-card rounded-2xl text-white text-base font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
-                >
+
+              <!-- Real-time Password Match & Quality Status Indicator -->
+              <div id="passwordMatchStatus" class="hidden px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 transition-all duration-300">
+                <span id="passwordMatchIcon" class="shrink-0"></span>
+                <span id="passwordMatchText" class="truncate"></span>
               </div>
             </div>
 
