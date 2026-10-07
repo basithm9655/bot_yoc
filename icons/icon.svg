@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Space Gradient -->
+    <radialGradient id="iconBgGrad" cx="50%" cy="12%" r="95%">
+      <stop offset="0%" stop-color="#1A4694" />
+      <stop offset="35%" stop-color="#0E2356" />
+      <stop offset="70%" stop-color="#071024" />
+      <stop offset="100%" stop-color="#020408" />
+    </radialGradient>
+
+    <!-- Glowing Halo Behind Ghost -->
+    <radialGradient id="auraGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.55" />
+      <stop offset="45%" stop-color="#2F7FF5" stop-opacity="0.30" />
+      <stop offset="80%" stop-color="#1D4ED8" stop-opacity="0.10" />
+      <stop offset="100%" stop-color="#1D4ED8" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Frosted Ghost Glass Body Gradient -->
+    <linearGradient id="ghostBody" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.98" />
+      <stop offset="35%" stop-color="#CBE5FF" stop-opacity="0.88" />
+      <stop offset="75%" stop-color="#60A5FA" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#1E4482" stop-opacity="0.65" />
+    </linearGradient>
+
+    <!-- Specular Highlight Sheen -->
+    <linearGradient id="sheenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#BAE6FD" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.1" />
+    </linearGradient>
+
+    <!-- Attendance Badge Gradient -->
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#2F7FF5" />
+      <stop offset="100%" stop-color="#1E40AF" />
+    </linearGradient>
+
+    <!-- Golden Checkmark Gradient -->
+    <linearGradient id="checkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Soft Drop Shadows -->
+    <filter id="ghostShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#000000" flood-opacity="0.7" />
+    </filter>
+
+    <filter id="badgeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#2F7FF5" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- Base Squircle Container -->
+  <rect width="512" height="512" rx="116" fill="url(#iconBgGrad)" />
+
+  <!-- Outer Luminous Ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#38BDF8" stroke-width="2" stroke-opacity="0.25" stroke-dasharray="8 6" />
+  <circle cx="256" cy="256" r="185" fill="none" stroke="#2F7FF5" stroke-width="1.5" stroke-opacity="0.35" />
+
+  <!-- Photonic Glowing Halo -->
+  <circle cx="256" cy="245" r="170" fill="url(#auraGlow)" />
+
+  <!-- Top Apple-Style Specular Glass Curve -->
+  <path d="M 40 40 Q 256 12 472 40 Q 450 160 256 180 Q 62 160 40 40 Z" fill="#FFFFFF" fill-opacity="0.04" />
+
+  <!-- MAIN GHOST MASCOT (Scaled to ~2.6x of the 120x120 vector) -->
+  <g transform="translate(256, 245) scale(2.6) translate(-60, -56)" filter="url(#ghostShadow)">
+    
+    <!-- Translucent Ghost Body Form -->
+    <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" 
+          fill="url(#ghostBody)" />
+
+    <!-- Specular Highlight Crest -->
+    <path d="M38 34C44 26 53 22 62 22C71 22 79 25 84 31" 
+          stroke="url(#sheenGrad)" stroke-linecap="round" stroke-width="2.6" />
+
+    <!-- Cute Big Friendly Catchlight Eyes -->
+    <ellipse cx="49" cy="49" fill="#040A18" rx="4.2" ry="5.4" />
+    <ellipse cx="71" cy="49" fill="#040A18" rx="4.2" ry="5.4" />
+    <!-- Catchlight sparkle highlights -->
+    <circle cx="50.8" cy="47.2" fill="#FFFFFF" r="1.8" />
+    <circle cx="72.8" cy="47.2" fill="#FFFFFF" r="1.8" />
+    <circle cx="47.5" cy="51.5" fill="#FFFFFF" r="0.8" />
+    <circle cx="69.5" cy="51.5" fill="#FFFFFF" r="0.8" />
+
+    <!-- Soft Blushing Cheeks -->
+    <circle cx="41.5" cy="56.5" fill="#60A5FA" fill-opacity="0.55" r="3.8" />
+    <circle cx="78.5" cy="56.5" fill="#60A5FA" fill-opacity="0.55" r="3.8" />
+
+    <!-- Happy Little Smiling Mouth -->
+    <path d="M56.5 57.5C58.5 60 61.5 60 63.5 57.5" 
+          stroke="#061228" stroke-linecap="round" stroke-width="2" />
+
+    <!-- Translucent Little Wave Arm (Left) -->
+    <path d="M28 58 Q 20 54 22 48 Q 25 44 29 51" fill="#BAE6FD" fill-opacity="0.75" />
+
+    <!-- Glowing Attendance Checkmark Badge (Centerpiece Held by Ghost) -->
+    <g transform="translate(60, 68)" filter="url(#badgeGlow)">
+      <!-- Badge Shield Pill -->
+      <rect x="-14" y="-3" width="28" height="20" rx="10" fill="url(#badgeGrad)" stroke="#60A5FA" stroke-width="1.2" />
+      <!-- Luminous Present Checkmark -->
+      <path d="M -6 6.5 L -1 11.5 L 7 2.5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <!-- Translucent Little Hands Supporting Badge -->
+    <ellipse cx="44" cy="74" rx="3.5" ry="3" fill="#E0F2FE" fill-opacity="0.85" />
+    <ellipse cx="76" cy="74" rx="3.5" ry="3" fill="#E0F2FE" fill-opacity="0.85" />
+  </g>
+
+  <!-- Bottom Accent Sheen Line -->
+  <line x1="160" y1="465" x2="352" y2="465" stroke="#38BDF8" stroke-width="2" stroke-opacity="0.4" stroke-linecap="round" />
+</svg>

@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Attendance</title>
+  <!-- Google Fonts: Inter configured for Apple SF Pro look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'SF Pro Display', 'sans-serif'],
+          },
+          colors: {
+            apple: {
+              black: '#000000',
+              canvas: '#0A0A0C',
+              card: '#161618',
+              cardElevated: '#1C1C1E',
+              cardHighlight: '#242426',
+              border: 'rgba(255, 255, 255, 0.08)',
+              borderSubtle: 'rgba(255, 255, 255, 0.04)',
+              accent: 'var(--accent-color, #0A84FF)',
+              accentLight: 'var(--accent-light, #2997FF)',
+              blue: '#0A84FF',
+              blueDark: '#0066CC',
+              blueGlow: 'rgba(10, 132, 255, 0.35)',
+              red: '#FF453A',
+              redDark: '#C93B32',
+              label: '#FFFFFF',
+              secondary: '#8E8E93',
+              tertiary: '#636366',
+              quaternary: '#3A3A3C'
+            }
+          },
+          boxShadow: {
+            'apple-card': '0 20px 40px -15px rgba(0, 0, 0, 0.7)',
+            'apple-glow': '0 0 50px -5px var(--accent-glow, rgba(10, 132, 255, 0.35))',
+            'apple-glow-lg': '0 0 70px 0px var(--accent-glow-lg, rgba(10, 132, 255, 0.5))',
+            'apple-glass': 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.12)',
+            'apple-inset': 'inset 0 2px 4px rgba(0, 0, 0, 0.4)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --accent-color: #2F7FF5;
+      --accent-light: #529BF8;
+      --accent-glow: rgba(47, 127, 245, 0.4);
+      --accent-glow-lg: rgba(47, 127, 245, 0.6);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      user-select: none;
+      background-color: #020306;
+      color: #FFFFFF;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Photorealistic Sapphire Mesh Gradient Background matching reference */
+    .mesh-ambient-bg {
+      background: 
+        radial-gradient(ellipse 95% 60% at 50% -8%, rgba(56, 139, 255, 0.48) 0%, rgba(24, 80, 210, 0.26) 38%, rgba(8, 22, 75, 0.12) 65%, transparent 100%),
+        radial-gradient(circle 380px at 98% 30%, rgba(47, 127, 245, 0.20) 0%, transparent 68%),
+        radial-gradient(circle 320px at 2% 58%, rgba(20, 65, 175, 0.16) 0%, transparent 65%),
+        radial-gradient(circle 260px at 50% 95%, rgba(30, 80, 200, 0.08) 0%, transparent 80%),
+        #04060A;
+    }
+
+    /* Refined Zentra Glass card style with specular top sheen */
+    .zentra-card {
+      background: linear-gradient(180deg, rgba(23, 28, 42, 0.72) 0%, rgba(11, 14, 22, 0.82) 100%);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3),
+        0 16px 36px -10px rgba(0, 0, 0, 0.75);
+    }
+
+    .zentra-card-elevated {
+      background: linear-gradient(180deg, rgba(28, 34, 50, 0.82) 0%, rgba(14, 18, 28, 0.92) 100%);
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.4),
+        0 24px 48px -12px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Tactile tap feedback */
+    .tap-scale {
+      transition: transform 0.18s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.15s ease;
+    }
+    .tap-scale:active {
+      transform: scale(0.96);
+      opacity: 0.88;
+    }
+
+    /* Primary glowing action button styling */
+    .btn-gradient-primary {
+      background: linear-gradient(180deg, #4493F8 0%, #1D6FE5 48%, #1052BE 100%);
+      box-shadow: 
+        0 14px 34px -4px rgba(29, 111, 229, 0.55), 
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.3);
+    }
+    .btn-gradient-primary:active {
+      background: linear-gradient(180deg, #3283EA 0%, #175EC7 100%);
+      box-shadow: 0 6px 18px -2px rgba(29, 111, 229, 0.4);
+    }
+
+    /* Ambient pulse aura for the primary action button */
+    @keyframes appleAura {
+      0%, 100% {
+        box-shadow: 
+          0 0 0 1px rgba(79, 161, 255, 0.25),
+          0 0 45px 0px rgba(47, 127, 245, 0.45), 
+          inset 0 1px 2px rgba(255, 255, 255, 0.35);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 
+          0 0 0 4px rgba(79, 161, 255, 0.15),
+          0 0 70px 10px rgba(47, 127, 245, 0.65), 
+          inset 0 1px 2px rgba(255, 255, 255, 0.55);
+        transform: scale(1.018);
+      }
+    }
+    .apple-pulse-aura {
+      animation: appleAura 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    /* Concentric outer halo pulse */
+    @keyframes haloBreathe {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(1.06); }
+    }
+    .orb-halo {
+      animation: haloBreathe 3.8s ease-in-out infinite;
+    }
+
+    /* Dynamic Island subtle breathe */
+    @keyframes islandBreathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    .island-pill {
+      animation: islandBreathe 4s ease-in-out infinite;
+    }
+
+    /* Smooth Screen Transition */
+    .screen-fade {
+      animation: screenSlideFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes screenSlideFade {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Native Bottom Sheet Slide */
+    .sheet-up {
+      animation: sheetSlideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+    }
+    @keyframes sheetSlideUp {
+      from {
+        transform: translateY(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    /* Circular Progress Indicator with overflow visible to prevent clipping */
+    .circular-chart {
+      transform: rotate(-90deg);
+      overflow: visible;
+    }
+    .circle-bg {
+      stroke: rgba(255, 255, 255, 0.08);
+    }
+    .circle-val {
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s cubic-bezier(0.34, 1.4, 0.64, 1);
+      filter: drop-shadow(0 0 6px rgba(56, 139, 255, 0.75));
+    }
+
+    /* Subtle Glass Shimmer effect for marked badge */
+    @keyframes sheenPass {
+      0% { transform: translateX(-160%) skewX(-20deg); }
+      100% { transform: translateX(220%) skewX(-20deg); }
+    }
+    .sheen-active::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+      animation: sheenPass 4.2s infinite;
+      pointer-events: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-0 sm:p-5 selection:bg-blue-500/30">
+
+  <!-- Native Phone Bezel Canvas with Reference Blue Ambient Background -->
+  <div class="mesh-ambient-bg w-full max-w-[420px] h-[100dvh] sm:h-[844px] sm:rounded-[50px] sm:shadow-[0_25px_80px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col relative sm:border-[8px] sm:border-[#14161C] ring-1 ring-white/10">
+    
+    <!-- Confetti canvas overlay for instant check-in celebration -->
+    <canvas id="confettiCanvas" class="pointer-events-none absolute inset-0 w-full h-full z-50"></canvas>
+
+    <!-- Native iOS Status Bar with Dynamic Island -->
+    <header class="w-full px-6 pt-3 pb-2 flex justify-between items-center text-xs font-semibold z-40 select-none bg-transparent backdrop-blur-md border-b border-white/[0.04]">
+      <span id="statusBarTime" class="font-bold tracking-tight text-white/90 text-sm">9:41</span>
+      
+      <!-- Interactive Dynamic Island Pill -->
+      <div id="dynamicIsland" class="island-pill flex items-center space-x-2 bg-[#0C101A]/90 border border-white/15 text-white px-3.5 py-1 rounded-full text-[11px] font-medium shadow-lg backdrop-blur-md transition-all duration-300">
+        <span id="islandDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="islandText" class="tracking-tight text-white/80 font-medium">Not Marked</span>
+      </div>
+
+      <!-- Quick Actions / Auth Switcher -->
+      <div class="flex items-center space-x-2">
+        <button id="authToggleBtn" class="text-[11px] font-semibold text-white/70 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] px-2.5 py-0.5 rounded-full border border-white/10 transition" title="Switch Demo Profile">
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Scrollable App Container -->
+    <main id="appContainer" class="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+      
+      <!-- ============================================== -->
+      <!-- SCREEN 1: LOGIN (ZENTRA-STYLE MINIMAL) -->
+      <!-- ============================================== -->
+      <section id="screenLogin" class="hidden flex-1 flex-col justify-between px-7 py-8 screen-fade">
+        <div class="pt-6">
+          <!-- Logo & Brand Header styled like reference -->
+          <div class="flex flex-col items-start text-left">
+            <div class="flex items-center space-x-2.5 mb-8">
+              <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#2F7FF5] to-[#60A5FA] text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <svg class="w-5 h-5 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v2.25A2.25 2.25 0 006 10.5zm0 9.75h2.25A2.25 2.25 0 0010.5 18v-2.25a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25V18A2.25 2.25 0 006 20.25zm9.75-9.75H18a2.25 2.25 0 002.25-2.25V6A2.25 2.25 0 0018 3.75h-2.25A2.25 2.25 0 0013.5 6v2.25a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <span class="text-base font-bold tracking-tight text-white">Attendance</span>
+            </div>
+
+            <h1 class="text-3xl font-extrabold tracking-tight text-white leading-tight">
+              Track Daily, <br>
+              <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#2F7FF5] to-[#70B4FF]">Shape Your Goals.</span>
+            </h1>
+            <p class="text-sm text-white/60 mt-2 font-normal leading-relaxed">
+              Sign in with your student credentials to log your presence in one effortless tap.
+            </p>
+          </div>
+
+          <!-- Login Form -->
+          <form id="loginForm" class="mt-8 space-y-4" onsubmit="event.preventDefault(); handleLogin();">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1.5 pl-1">Email or Phone</label>
+              <input 
+                id="loginIdentity" 
+                type="text" 
+                required 
+                placeholder="student@school.edu" 
+                value="alex.student@school.edu" 
+                class="w-full px-4 py-3.5 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] focus:ring-1 focus:ring-[#2F7FF5] transition"
+              >
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1.5 pl-1">Password</label>
+              <input 
+                id="loginPassword" 
+                type="password" 
+                required 
+                placeholder="••••••••" 
+                value="password123" 
+                class="w-full px-4 py-3.5 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] focus:ring-1 focus:ring-[#2F7FF5] transition"
+              >
+            </div>
+
+            <button 
+              type="submit" 
+              class="tap-scale btn-gradient-primary w-full mt-4 py-4 rounded-2xl text-white text-sm font-bold tracking-wide transition shadow-lg"
+            >
+              Sign In
+            </button>
+          </form>
+        </div>
+
+        <!-- Create Account link -->
+        <div class="text-center pt-6 pb-2">
+          <button type="button" onclick="showScreen('signup')" class="text-sm font-medium text-white/60 hover:text-white transition">
+            Don't have an account? <span class="font-semibold text-[#529BF8] ml-0.5">Create account</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- SCREEN 2: SIGN UP -->
+      <!-- ============================================== -->
+      <section id="screenSignup" class="hidden flex-1 flex-col justify-between px-7 py-6 screen-fade">
+        <div>
+          <!-- Back button & Header -->
+          <div class="flex items-center space-x-3 mb-6">
+            <button onclick="showScreen('login')" class="tap-scale p-2 -ml-2 rounded-xl text-white/70 hover:text-white bg-white/[0.06] border border-white/10">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <h2 class="text-xl font-bold text-white tracking-tight">Create Account</h2>
+          </div>
+
+          <form id="signupForm" class="space-y-3.5" onsubmit="event.preventDefault(); handleSignup();">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Full Name</label>
+              <input 
+                id="signupName" 
+                type="text" 
+                required 
+                placeholder="Alex Morgan" 
+                class="w-full px-4 py-3 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+              >
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Email or Phone</label>
+              <input 
+                id="signupIdentity" 
+                type="text" 
+                required 
+                placeholder="alex@school.edu" 
+                class="w-full px-4 py-3 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+              >
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Password</label>
+              <input 
+                id="signupPassword" 
+                type="password" 
+                required 
+                placeholder="••••••••" 
+                class="w-full px-4 py-3 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+              >
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Confirm Password</label>
+              <input 
+                id="signupConfirm" 
+                type="password" 
+                required 
+                placeholder="••••••••" 
+                class="w-full px-4 py-3 zentra-card rounded-2xl text-white text-sm font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+              >
+            </div>
+
+            <button 
+              type="submit" 
+              class="tap-scale btn-gradient-primary w-full mt-4 py-3.5 rounded-2xl text-white text-sm font-bold tracking-wide transition shadow-lg"
+            >
+              Continue
+            </button>
+          </form>
+        </div>
+
+        <div class="text-center pt-4 pb-2">
+          <button type="button" onclick="showScreen('login')" class="text-sm font-medium text-white/60 hover:text-white transition">
+            Already have an account? <span class="font-semibold text-[#529BF8]">Sign In</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- WAITING FOR APPROVAL SCREEN -->
+      <section id="screenApproval" class="hidden flex-1 flex-col items-center justify-center px-8 py-10 text-center screen-fade">
+        <div class="w-16 h-16 rounded-[24px] zentra-card-elevated border border-amber-500/20 text-amber-400 flex items-center justify-center mb-5 shadow-lg">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2 tracking-tight">Waiting for approval</h2>
+        <p class="text-sm text-white/60 leading-relaxed max-w-xs mb-8">
+          Your account has been registered. An instructor will approve your profile shortly.
+        </p>
+        <button 
+          onclick="proceedToAppAfterApproval()" 
+          class="tap-scale btn-gradient-primary px-7 py-3 rounded-2xl text-white text-sm font-bold tracking-wide transition shadow-lg"
+        >
+          Continue to App
+        </button>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- SCREEN 3: MAIN ATTENDANCE SCREEN (BLUE AMBIENT) -->
+      <!-- ============================================== -->
+      <section id="screenAttendance" class="flex-1 flex flex-col justify-between px-6 pt-4 pb-3 screen-fade">
+        
+        <!-- Header Info & Greeting -->
+        <div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-[#2F7FF5] to-[#70B4FF] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <span class="text-sm font-bold text-white/80 tracking-tight">Attendance</span>
+            </div>
+            
+            <!-- Live status tag -->
+            <span class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-white/[0.08] text-white/90 border border-white/10 backdrop-blur-md">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_8px_#2F7FF5]"></span>
+              <span>Active</span>
+            </span>
+          </div>
+
+          <!-- Date display & Greeting -->
+          <div class="mt-4">
+            <p id="studentGreeting" class="text-xs font-semibold uppercase tracking-wider text-white/50">Good morning, Alex</p>
+            <div id="displayDate" class="text-2xl sm:text-[28px] font-extrabold tracking-tight text-white mt-0.5">
+              Wednesday, 8 October
+            </div>
+          </div>
+
+          <!-- Quick Glance Streak Dots -->
+          <div class="mt-3.5 zentra-card rounded-2xl p-2.5 flex items-center justify-between shadow-sm">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-white/50 pl-1.5">This Week</span>
+            <div id="weekDaysRow" class="flex space-x-2">
+              <!-- Rendered dynamically via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Focus: Primary Attendance Action Button -->
+        <div class="my-auto py-5 flex flex-col items-center justify-center relative">
+          
+          <!-- STATE A: UNMARKED (Ready to mark) -->
+          <div id="unmarkedState" class="w-full flex flex-col items-center relative">
+            <!-- Ambient Concentric Halo Ring behind the button -->
+            <div class="orb-halo pointer-events-none absolute w-72 h-72 rounded-full bg-gradient-to-b from-[#2F7FF5]/20 to-transparent blur-xl -z-10"></div>
+
+            <button 
+              id="markAttendanceBtn"
+              onclick="markTodayAttendance()"
+              class="tap-scale apple-pulse-aura group relative w-60 h-60 rounded-full bg-gradient-to-b from-[#183463] via-[#0E2040] to-[#081324] border border-[#4FA1FF]/60 text-white transition-all duration-300 flex flex-col items-center justify-center p-6 select-none shadow-[0_0_60px_rgba(47,127,245,0.45)]"
+            >
+              <!-- Specular Glass Highlight Arc -->
+              <div class="pointer-events-none absolute inset-x-8 top-3 h-10 rounded-full bg-gradient-to-b from-white/20 to-transparent blur-[1px]"></div>
+
+              <!-- Glass inner orb with rich sapphire gradient & precisely centered checkmark -->
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-[#2F7FF5] to-[#70B4FF] text-white flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(47,127,245,0.7)] group-hover:scale-105 transition duration-300 ring-1 ring-white/30 overflow-hidden">
+                <svg class="w-8 h-8 text-white drop-shadow-md" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <span class="text-[11px] font-bold tracking-widest uppercase text-[#80BDFF]">TAP TO RECORD</span>
+              <span class="text-base font-extrabold tracking-tight mt-1 text-center text-white">
+                MARK ATTENDANCE
+              </span>
+            </button>
+            <p class="text-[11px] text-white/50 mt-5 font-medium flex items-center space-x-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_6px_#2F7FF5]"></span>
+              <span>Instant one-tap verified check-in</span>
+            </p>
+          </div>
+
+          <!-- STATE B: MARKED (Already checked in) -->
+          <div id="markedState" class="hidden w-full flex flex-col items-center screen-fade relative">
+            <!-- Ambient Aura behind marked state -->
+            <div class="pointer-events-none absolute w-72 h-72 rounded-full bg-gradient-to-b from-[#2F7FF5]/25 to-transparent blur-2xl -z-10"></div>
+
+            <div class="relative overflow-hidden w-60 h-60 rounded-full bg-gradient-to-b from-[#142B52] to-[#0A162B] border border-[#529BF8]/80 flex flex-col items-center justify-center p-6 shadow-[0_0_55px_rgba(47,127,245,0.55)] sheen-active">
+              <!-- Specular Glass Highlight Arc -->
+              <div class="pointer-events-none absolute inset-x-8 top-3 h-10 rounded-full bg-gradient-to-b from-white/20 to-transparent blur-[1px]"></div>
+
+              <div class="w-20 h-20 rounded-full bg-[#2F7FF5] text-white flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(47,127,245,0.85)] ring-1 ring-white/30 overflow-hidden">
+                <svg class="w-8 h-8 drop-shadow" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <span class="text-white font-black tracking-wider text-xl">✓ PRESENT</span>
+              <span id="markedTimestamp" class="text-xs font-semibold text-white/80 mt-1">Logged today at 09:41 AM</span>
+            </div>
+
+            <!-- Destructive action: Delete today's attendance -->
+            <button 
+              onclick="openDeleteConfirmation()"
+              class="tap-scale mt-5 inline-flex items-center space-x-2 px-4 py-2 text-xs font-semibold text-[#FF453A] hover:text-white bg-[#FF453A]/10 hover:bg-[#FF453A]/20 rounded-xl transition border border-[#FF453A]/20"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+              <span>Delete today's attendance</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Bottom Card: Your Attendance Summary -->
+        <div class="w-full zentra-card-elevated rounded-[28px] p-5 shadow-2xl mb-2">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 pr-4">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-white/50 block">Your Attendance</span>
+              <div class="flex items-baseline space-x-2.5 mt-1">
+                <span id="percentageDisplay" class="text-3xl font-black text-white tracking-tight">92.5%</span>
+                <span id="ratioDisplay" class="text-sm font-semibold text-white/60">37 / 40 days</span>
+              </div>
+              <p class="text-xs text-white/50 mt-1 font-medium">Consistent attendance active</p>
+            </div>
+
+            <!-- Fully Contained Circular Progress Indicator with Normalized Path Length -->
+            <div class="relative w-16 h-16 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 42 42" class="w-16 h-16 circular-chart">
+                <defs>
+                  <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#38BDF8" />
+                    <stop offset="100%" stop-color="#1D4ED8" />
+                  </linearGradient>
+                </defs>
+                <circle class="circle-bg"
+                  cx="21"
+                  cy="21"
+                  r="16.5"
+                  stroke-width="3.2"
+                  fill="none"
+                />
+                <circle id="svgProgressCircle" class="circle-val"
+                  cx="21"
+                  cy="21"
+                  r="16.5"
+                  stroke="url(#progressGrad)"
+                  stroke-width="3.2"
+                  stroke-dasharray="100"
+                  stroke-dashoffset="7.5"
+                  pathLength="100"
+                  fill="none"
+                />
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span class="text-xs font-bold text-white tracking-tight" id="progressCircleNumber">93%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ============================================== -->
+      <!-- SCREEN 4: ATTENDANCE HISTORY -->
+      <!-- ============================================== -->
+      <section id="screenHistory" class="hidden flex-1 flex-col px-6 pt-4 pb-4 screen-fade">
+        <div class="mb-4">
+          <span class="text-[11px] uppercase font-bold tracking-widest text-white/50">Records</span>
+          <h2 class="text-2xl font-bold tracking-tight text-white mt-0.5">Attendance History</h2>
+          <p class="text-xs text-white/50 mt-0.5">Clean verified log of your daily attendance</p>
+        </div>
+
+        <!-- Filter Segmented Tabs matching the reference image pill design -->
+        <div class="flex items-center p-1 bg-black/40 border border-white/10 rounded-2xl mb-4 text-xs font-semibold backdrop-blur-md">
+          <button id="filterAllBtn" onclick="setHistoryFilter('all')" class="tap-scale flex-1 py-2 rounded-xl bg-gradient-to-r from-[#2F7FF5] to-[#4FA1FF] text-white text-center transition font-bold shadow-md">
+            All (<span id="filterAllCount">40</span>)
+          </button>
+          <button id="filterPresentBtn" onclick="setHistoryFilter('present')" class="tap-scale flex-1 py-2 rounded-xl text-white/60 hover:text-white text-center transition">
+            Present (<span id="filterPresentCount">37</span>)
+          </button>
+          <button id="filterAbsentBtn" onclick="setHistoryFilter('absent')" class="tap-scale flex-1 py-2 rounded-xl text-white/60 hover:text-white text-center transition">
+            Absent (<span id="filterAbsentCount">3</span>)
+          </button>
+        </div>
+
+        <!-- History Grouped List -->
+        <div id="historyListContainer" class="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-0.5 pb-2">
+          <!-- Dynamically populated from JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- PWA Install Prompt Banner -->
+    <div id="pwaBanner" class="mx-4 mb-2 p-3 zentra-card-elevated rounded-2xl flex items-center justify-between text-xs z-30 shadow-2xl transition-all duration-300">
+      <div class="flex items-center space-x-3 overflow-hidden">
+        <div class="w-9 h-9 rounded-xl bg-[#2F7FF5]/20 text-[#529BF8] border border-[#2F7FF5]/30 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="truncate">
+          <p class="font-bold text-white leading-tight">Install Attendance</p>
+          <p class="text-[11px] text-white/50 truncate">Add to Home Screen for 1-tap launch</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-1.5 flex-shrink-0 ml-2">
+        <button onclick="simulateInstallPwa()" class="tap-scale btn-gradient-primary px-3 py-1.5 text-white rounded-xl font-bold text-[11px] transition shadow-sm">
+          Install App
+        </button>
+        <button onclick="dismissPwaBanner()" class="p-1.5 text-white/50 hover:text-white rounded-lg">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav id="bottomNav" class="w-full bg-[#080B12]/85 backdrop-blur-2xl border-t border-white/[0.08] px-8 pt-2.5 pb-2 flex justify-around items-center z-30 select-none">
+      
+      <!-- Tab 1: Attendance -->
+      <button 
+        id="tabAttendanceBtn" 
+        onclick="switchNavTab('attendance')" 
+        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition"
+      >
+        <div class="relative">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Attendance</span>
+      </button>
+
+      <!-- Tab 2: History -->
+      <button 
+        id="tabHistoryBtn" 
+        onclick="switchNavTab('history')" 
+        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition"
+      >
+        <div class="relative">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <span class="text-[10px] font-bold tracking-tight mt-1">History</span>
+      </button>
+
+    </nav>
+
+    <!-- iOS Home Indicator bar -->
+    <div class="w-full py-1.5 flex justify-center items-center bg-[#080B12]/85 select-none pointer-events-none">
+      <div class="w-32 h-1 bg-white/20 rounded-full"></div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div id="deleteModal" class="hidden absolute inset-0 z-50 flex flex-col justify-end">
+      <!-- Translucent Backdrop -->
+      <div onclick="closeDeleteConfirmation()" class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
+      
+      <!-- Action Sheet Container -->
+      <div class="sheet-up relative w-full zentra-card-elevated rounded-t-[34px] p-6 shadow-2xl text-center z-10 border-t border-white/15">
+        <!-- Sheet Notch -->
+        <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4"></div>
+
+        <div class="w-12 h-12 rounded-2xl bg-[#FF453A]/15 text-[#FF453A] flex items-center justify-center mx-auto mb-3 border border-[#FF453A]/25 shadow-sm">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white tracking-tight">Delete today's attendance?</h3>
+        <p class="text-xs text-white/60 mt-1 mb-6 px-4">
+          This will revoke today's check-in record and recalculate your overall percentage.
+        </p>
+
+        <div class="flex space-x-3 mb-2">
+          <button 
+            onclick="closeDeleteConfirmation()" 
+            class="tap-scale flex-1 py-3.5 rounded-2xl bg-white/10 border border-white/10 text-white text-xs font-bold hover:bg-white/15 transition"
+          >
+            Cancel
+          </button>
+          <button 
+            onclick="confirmDeleteTodayAttendance()" 
+            class="tap-scale flex-1 py-3.5 rounded-2xl bg-[#FF453A] text-white text-xs font-bold hover:bg-[#D9382F] shadow-lg transition"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Feedback Message -->
+    <div id="toastMessage" class="hidden absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-[#161B26]/95 border border-white/20 backdrop-blur-xl text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl pointer-events-none transition-all duration-300">
+      <span id="toastText">Attendance marked</span>
+    </div>
+
+  </div>
+
+  <script>
+    const THEME = {
+      accent: '#2F7FF5',
+      light: '#529BF8',
+      confetti: ['#2F7FF5', '#529BF8', '#70B4FF', '#FFFFFF', '#60A5FA', '#3B82F6']
+    };
+
+    const STATE = {
+      isAuthenticated: true,
+      currentUser: {
+        name: "Alex",
+        email: "alex.student@school.edu"
+      },
+      currentScreen: 'attendance',
+      todayMarked: false,
+      todayMarkedTime: "09:41 AM",
+      activeHistoryFilter: 'all',
+      historyRecords: [
+        { date: "2026-10-08", label: "08 Oct", status: "unmarked", time: "09:41 AM", month: "October 2026" },
+        { date: "2026-10-07", label: "07 Oct", status: "present", time: "09:12 AM", month: "October 2026" },
+        { date: "2026-10-06", label: "06 Oct", status: "absent",  time: "--", month: "October 2026" },
+        { date: "2026-10-05", label: "05 Oct", status: "present", time: "08:55 AM", month: "October 2026" },
+        { date: "2026-10-04", label: "04 Oct", status: "present", time: "09:02 AM", month: "October 2026" },
+        { date: "2026-10-03", label: "03 Oct", status: "present", time: "09:15 AM", month: "October 2026" },
+        { date: "2026-10-02", label: "02 Oct", status: "present", time: "09:00 AM", month: "October 2026" },
+        { date: "2026-10-01", label: "01 Oct", status: "present", time: "09:20 AM", month: "October 2026" },
+
+        { date: "2026-09-30", label: "30 Sep", status: "present", time: "09:10 AM", month: "September 2026" },
+        { date: "2026-09-29", label: "29 Sep", status: "present", time: "09:04 AM", month: "September 2026" },
+        { date: "2026-09-28", label: "28 Sep", status: "present", time: "09:18 AM", month: "September 2026" },
+        { date: "2026-09-27", label: "27 Sep", status: "absent",  time: "--", month: "September 2026" },
+        { date: "2026-09-26", label: "26 Sep", status: "present", time: "08:58 AM", month: "September 2026" },
+        { date: "2026-09-25", label: "25 Sep", status: "present", time: "09:05 AM", month: "September 2026" },
+        { date: "2026-09-24", label: "24 Sep", status: "present", time: "09:11 AM", month: "September 2026" },
+        { date: "2026-09-23", label: "23 Sep", status: "present", time: "09:03 AM", month: "September 2026" },
+        { date: "2026-09-22", label: "22 Sep", status: "present", time: "09:14 AM", month: "September 2026" }
+      ]
+    };
+
+    /* Synthetic Glass Chime for tactile feedback */
+    function playChime(isPositive = true) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (isPositive) {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880.00, ctx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.18, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.46);
+        } else {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(320, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.16);
+        }
+      } catch (e) {}
+    }
+
+    function triggerConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      const particles = [];
+      const colors = THEME.confetti;
+
+      for (let i = 0; i < 45; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height * 0.45,
+          vx: (Math.random() - 0.5) * 11,
+          vy: (Math.random() - 0.7) * 12 - 2,
+          size: Math.random() * 5 + 3,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 12,
+          alpha: 1,
+          decay: Math.random() * 0.02 + 0.012
+        });
+      }
+
+      let animId;
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.35;
+          p.vx *= 0.98;
+          p.rotation += p.rotSpeed;
+          p.alpha -= p.decay;
+
+          if (p.alpha > 0) {
+            alive = true;
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rotation * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
+            ctx.restore();
+          }
+        });
+
+        if (alive) {
+          animId = requestAnimationFrame(animate);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animId);
+        }
+      }
+      animate();
+    }
+
+    function renderWeekStrip() {
+      const row = document.getElementById('weekDaysRow');
+      if (!row) return;
+      row.innerHTML = '';
+
+      const days = [
+        { label: 'M', status: 'present', isToday: false },
+        { label: 'T', status: 'present', isToday: false },
+        { label: 'W', status: STATE.todayMarked ? 'present' : 'unmarked', isToday: true },
+        { label: 'T', status: 'upcoming', isToday: false },
+        { label: 'F', status: 'upcoming', isToday: false },
+        { label: 'S', status: 'off', isToday: false },
+        { label: 'S', status: 'off', isToday: false }
+      ];
+
+      days.forEach(d => {
+        const pill = document.createElement('div');
+        let bgStyle = 'bg-white/[0.04] text-white/50 border border-white/[0.05]';
+        let ringStyle = d.isToday ? 'ring-1 ring-[#2F7FF5] text-white font-bold' : '';
+
+        if (d.status === 'present') {
+          bgStyle = 'btn-gradient-primary text-white font-bold shadow-[0_0_8px_rgba(47,127,245,0.4)]';
+        } else if (d.isToday) {
+          bgStyle = 'bg-[#2F7FF5]/15 text-[#529BF8] font-bold border border-[#2F7FF5]/30';
+        }
+
+        pill.className = `w-7 h-8 rounded-xl flex flex-col items-center justify-center text-[10px] ${bgStyle} ${ringStyle} transition-all duration-200`;
+        pill.innerHTML = `
+          <span>${d.label}</span>
+          <span class="text-[8px] mt-0.5 leading-none">${d.status === 'present' ? '●' : '○'}</span>
+        `;
+        row.appendChild(pill);
+      });
+    }
+
+    function updateDynamicIsland() {
+      const dot = document.getElementById('islandDot');
+      const text = document.getElementById('islandText');
+      if (STATE.todayMarked) {
+        dot.className = "w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_8px_#2F7FF5]";
+        text.className = "tracking-tight text-white font-medium";
+        text.textContent = "Present";
+      } else {
+        dot.className = "w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse";
+        text.className = "tracking-tight text-white/80 font-medium";
+        text.textContent = "Not Marked";
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const timeElem = document.getElementById('statusBarTime');
+      if (timeElem) timeElem.textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function setupDateDisplay() {
+      const dateElem = document.getElementById('displayDate');
+      const now = new Date();
+      const options = { weekday: 'long', day: 'numeric', month: 'long' };
+      dateElem.textContent = now.toLocaleDateString('en-GB', options);
+    }
+
+    function recalculateStats() {
+      const loggedDays = STATE.historyRecords.filter(r => r.status === 'present' || r.status === 'absent');
+      const totalDays = loggedDays.length;
+      const presentDays = loggedDays.filter(r => r.status === 'present').length;
+
+      let pct = 0;
+      if (totalDays > 0) {
+        pct = ((presentDays / totalDays) * 100).toFixed(1);
+      }
+
+      document.getElementById('percentageDisplay').textContent = `${pct}%`;
+      document.getElementById('ratioDisplay').textContent = `${presentDays} / ${totalDays} days`;
+      document.getElementById('progressCircleNumber').textContent = `${Math.round(pct)}%`;
+
+      const svgCircle = document.getElementById('svgProgressCircle');
+      if (svgCircle) {
+        const offset = Math.max(0, 100 - parseFloat(pct));
+        svgCircle.style.strokeDashoffset = offset;
+      }
+
+      const totalCount = STATE.historyRecords.filter(r => r.status !== 'unmarked').length;
+      const presentCount = STATE.historyRecords.filter(r => r.status === 'present').length;
+      const absentCount = STATE.historyRecords.filter(r => r.status === 'absent').length;
+
+      const filterAll = document.getElementById('filterAllCount');
+      const filterPres = document.getElementById('filterPresentCount');
+      const filterAbs = document.getElementById('filterAbsentCount');
+      if (filterAll) filterAll.textContent = totalCount;
+      if (filterPres) filterPres.textContent = presentCount;
+      if (filterAbs) filterAbs.textContent = absentCount;
+    }
+
+    function syncAttendanceButtonState() {
+      const unmarkedView = document.getElementById('unmarkedState');
+      const markedView = document.getElementById('markedState');
+
+      if (STATE.todayMarked) {
+        unmarkedView.classList.add('hidden');
+        markedView.classList.remove('hidden');
+      } else {
+        markedView.classList.add('hidden');
+        unmarkedView.classList.remove('hidden');
+      }
+      updateDynamicIsland();
+      renderWeekStrip();
+    }
+
+    function markTodayAttendance() {
+      playChime(true);
+      triggerConfetti();
+
+      STATE.todayMarked = true;
+      const now = new Date();
+      STATE.todayMarkedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('markedTimestamp').textContent = `Logged today at ${STATE.todayMarkedTime}`;
+
+      const todayRecord = STATE.historyRecords.find(r => r.label === "08 Oct" || r.date === "2026-10-08");
+      if (todayRecord) {
+        todayRecord.status = 'present';
+        todayRecord.time = STATE.todayMarkedTime;
+      } else {
+        STATE.historyRecords.unshift({
+          date: "2026-10-08",
+          label: "08 Oct",
+          status: "present",
+          time: STATE.todayMarkedTime,
+          month: "October 2026"
+        });
+      }
+
+      syncAttendanceButtonState();
+      recalculateStats();
+      showToast("✓ Attendance recorded");
+    }
+
+    function openDeleteConfirmation() {
+      const modal = document.getElementById('deleteModal');
+      modal.classList.remove('hidden');
+    }
+
+    function closeDeleteConfirmation() {
+      const modal = document.getElementById('deleteModal');
+      modal.classList.add('hidden');
+    }
+
+    function confirmDeleteTodayAttendance() {
+      playChime(false);
+      closeDeleteConfirmation();
+      STATE.todayMarked = false;
+
+      const todayRecord = STATE.historyRecords.find(r => r.label === "08 Oct" || r.date === "2026-10-08");
+      if (todayRecord) {
+        todayRecord.status = 'unmarked';
+      }
+
+      syncAttendanceButtonState();
+      recalculateStats();
+      showToast("Today's record deleted");
+    }
+
+    function setHistoryFilter(filter) {
+      STATE.activeHistoryFilter = filter;
+      const allBtn = document.getElementById('filterAllBtn');
+      const presBtn = document.getElementById('filterPresentBtn');
+      const absBtn = document.getElementById('filterAbsentBtn');
+
+      [allBtn, presBtn, absBtn].forEach(b => {
+        b.className = "tap-scale flex-1 py-2 rounded-xl text-white/60 hover:text-white text-center transition";
+      });
+
+      if (filter === 'all') {
+        allBtn.className = "tap-scale flex-1 py-2 rounded-xl bg-gradient-to-r from-[#2F7FF5] to-[#4FA1FF] text-white text-center font-bold shadow-md transition";
+      } else if (filter === 'present') {
+        presBtn.className = "tap-scale flex-1 py-2 rounded-xl bg-gradient-to-r from-[#2F7FF5] to-[#4FA1FF] text-white text-center font-bold shadow-md transition";
+      } else {
+        absBtn.className = "tap-scale flex-1 py-2 rounded-xl bg-gradient-to-r from-[#2F7FF5] to-[#4FA1FF] text-white text-center font-bold shadow-md transition";
+      }
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyListContainer');
+      container.innerHTML = '';
+
+      const groups = {};
+      STATE.historyRecords.forEach(item => {
+        if (item.status === 'unmarked') return;
+        if (STATE.activeHistoryFilter !== 'all' && item.status !== STATE.activeHistoryFilter) return;
+
+        if (!groups[item.month]) {
+          groups[item.month] = [];
+        }
+        groups[item.month].push(item);
+      });
+
+      const months = Object.keys(groups);
+      if (months.length === 0) {
+        container.innerHTML = `
+          <div class="py-16 text-center text-white/40 text-xs">
+            No ${STATE.activeHistoryFilter} attendance records found.
+          </div>
+        `;
+        return;
+      }
+
+      months.forEach(month => {
+        const monthPresentCount = groups[month].filter(i => i.status === 'present').length;
+        const monthTotal = groups[month].length;
+        const monthPct = Math.round((monthPresentCount / monthTotal) * 100);
+
+        const monthHeader = document.createElement('div');
+        monthHeader.className = "sticky top-0 bg-[#06080D]/85 backdrop-blur-md py-1.5 z-10 flex items-center justify-between border-b border-white/[0.05]";
+        monthHeader.innerHTML = `
+          <h3 class="text-[11px] font-bold text-white/50 uppercase tracking-wider">${month}</h3>
+          <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-white/[0.08] text-white/80 border border-white/10">
+            ${monthPresentCount}/${monthTotal} (${monthPct}%)
+          </span>
+        `;
+        container.appendChild(monthHeader);
+
+        const listGroup = document.createElement('div');
+        listGroup.className = "space-y-2 mt-2 mb-4";
+
+        groups[month].forEach(item => {
+          const isPresent = item.status === 'present';
+          const row = document.createElement('div');
+          row.className = `flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200 ${
+            isPresent 
+              ? 'zentra-card-elevated text-white' 
+              : 'zentra-card text-white/60'
+          }`;
+
+          row.innerHTML = `
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden ${
+                isPresent 
+                  ? 'btn-gradient-primary text-white shadow-sm' 
+                  : 'bg-white/10 text-white/50'
+              }">
+                ${isPresent ? '✓' : '✕'}
+              </span>
+              <div>
+                <span class="text-sm font-bold tracking-tight text-white block">${item.label}</span>
+                <span class="text-[11px] text-white/50 font-medium">${item.time !== '--' ? item.time : 'No record'}</span>
+              </div>
+            </div>
+            <span class="text-xs font-bold px-3 py-1 rounded-full ${
+              isPresent 
+                ? 'text-[#529BF8] bg-[#2F7FF5]/15 border border-[#2F7FF5]/30' 
+                : 'text-white/40 bg-white/[0.05] border border-white/[0.05]'
+            }">
+              ${isPresent ? 'Present' : 'Absent'}
+            </span>
+          `;
+          listGroup.appendChild(row);
+        });
+
+        container.appendChild(listGroup);
+      });
+    }
+
+    function showScreen(screenId) {
+      STATE.currentScreen = screenId;
+
+      const screens = ['screenLogin', 'screenSignup', 'screenApproval', 'screenAttendance', 'screenHistory'];
+      screens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+
+      const activeEl = document.getElementById(screenId === 'attendance' ? 'screenAttendance' :
+                               screenId === 'history' ? 'screenHistory' :
+                               screenId === 'login' ? 'screenLogin' :
+                               screenId === 'signup' ? 'screenSignup' : 'screenApproval');
+      if (activeEl) {
+        activeEl.classList.remove('hidden');
+      }
+
+      const bottomNav = document.getElementById('bottomNav');
+      const isAuthFlow = ['login', 'signup', 'approval'].includes(screenId);
+      if (isAuthFlow) {
+        bottomNav.classList.add('hidden');
+      } else {
+        bottomNav.classList.remove('hidden');
+        updateNavIcons(screenId);
+      }
+
+      const authToggleBtn = document.getElementById('authToggleBtn');
+      if (isAuthFlow) {
+        authToggleBtn.textContent = "Demo Login";
+      } else {
+        authToggleBtn.textContent = "Logout";
+      }
+    }
+
+    function switchNavTab(tab) {
+      if (tab === 'attendance') {
+        showScreen('attendance');
+      } else if (tab === 'history') {
+        renderHistory();
+        showScreen('history');
+      }
+    }
+
+    function updateNavIcons(activeTab) {
+      const attendanceBtn = document.getElementById('tabAttendanceBtn');
+      const historyBtn = document.getElementById('tabHistoryBtn');
+
+      if (activeTab === 'attendance') {
+        attendanceBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
+        historyBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+      } else {
+        historyBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
+        attendanceBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+      }
+    }
+
+    function handleLogin() {
+      const email = document.getElementById('loginIdentity').value;
+      STATE.isAuthenticated = true;
+      STATE.currentUser.email = email;
+      showToast("Welcome back, Alex");
+      showScreen('attendance');
+    }
+
+    function handleSignup() {
+      const name = document.getElementById('signupName').value || "Student";
+      STATE.currentUser.name = name;
+      showScreen('approval');
+    }
+
+    function proceedToAppAfterApproval() {
+      STATE.isAuthenticated = true;
+      showToast("Account approved");
+      showScreen('attendance');
+    }
+
+    function toggleAuthDemo() {
+      if (STATE.isAuthenticated && STATE.currentScreen !== 'login' && STATE.currentScreen !== 'signup' && STATE.currentScreen !== 'approval') {
+        STATE.isAuthenticated = false;
+        showScreen('login');
+      } else {
+        STATE.isAuthenticated = true;
+        showScreen('attendance');
+      }
+    }
+    document.getElementById('authToggleBtn').addEventListener('click', toggleAuthDemo);
+
+    function dismissPwaBanner() {
+      const banner = document.getElementById('pwaBanner');
+      banner.style.opacity = '0';
+      banner.style.transform = 'translateY(100%)';
+      setTimeout(() => banner.classList.add('hidden'), 300);
+    }
+
+    function simulateInstallPwa() {
+      playChime(true);
+      showToast("✓ Added to Home Screen");
+      dismissPwaBanner();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastMessage');
+      const text = document.getElementById('toastText');
+      text.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2400);
+    }
+
+    window.onload = function() {
+      setupDateDisplay();
+      recalculateStats();
+      syncAttendanceButtonState();
+      showScreen('attendance');
+    };
+  </script>
+</body>
+</html>
