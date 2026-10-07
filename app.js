@@ -519,16 +519,6 @@ function normalizeAuthIdentifier(input, rollNo = '') {
 // ------------------------------------------------------------------------------
 // 3. UI SCREEN NAVIGATION & TIME DISPLAY
 // ------------------------------------------------------------------------------
-function updateClock() {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const timeElem = document.getElementById('statusBarTime');
-  if (timeElem) timeElem.textContent = `${hours}:${minutes}`;
-}
-setInterval(updateClock, 1000);
-updateClock();
-
 function setupDateDisplay() {
   const dateElem = document.getElementById('displayDate');
   if (!dateElem) return;
@@ -538,22 +528,7 @@ function setupDateDisplay() {
 }
 
 function updateDynamicIsland() {
-  const dot = document.getElementById('islandDot');
-  const text = document.getElementById('islandText');
-  const ghost = document.getElementById('islandGhost');
-  if (!dot || !text) return;
-
-  if (STATE.todayMarked) {
-    dot.className = "w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_8px_#2F7FF5]";
-    text.className = "tracking-tight text-white font-medium";
-    text.textContent = "Present";
-    if (ghost) ghost.className = "inline-flex items-center text-[#529BF8] drop-shadow-[0_0_8px_rgba(47,127,245,0.7)] scale-110 transition-transform";
-  } else {
-    dot.className = "w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse";
-    text.className = "tracking-tight text-white/80 font-medium";
-    text.textContent = "Not Marked";
-    if (ghost) ghost.className = "inline-flex items-center text-white/40 transition-transform";
-  }
+  // Legacy stub - notch/dynamic island removed for native edge-to-edge mobile PWA
 }
 
 function showScreen(screenId) {
