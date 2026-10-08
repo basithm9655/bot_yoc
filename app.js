@@ -551,10 +551,10 @@ function showScreen(screenId) {
     }
   }
 
-  // For coordinator, daily attendance check-in is not needed (bypass to coordinator portal)
+  // For coordinator, daily attendance check-in is the primary tab; redirect history to attendance
   if (STATE.currentUser && STATE.currentUser.role === 'coordinator') {
-    if (screenId === 'attendance' || screenId === 'history') {
-      screenId = 'coordinator';
+    if (screenId === 'history') {
+      screenId = 'attendance';
     }
   }
 
@@ -684,16 +684,16 @@ function updateNavIcons(activeTab) {
       }
     }
   } else if (role === 'coordinator') {
-    // Hide student check-in & admin only tabs
-    if (attendanceBtn) attendanceBtn.classList.add('hidden');
+    // Hide student history, coordinator members, and admin only tabs
     if (historyBtn) historyBtn.classList.add('hidden');
+    if (coordMembersBtn) coordMembersBtn.classList.add('hidden');
     if (approvalsBtn) approvalsBtn.classList.add('hidden');
     if (consoleBtn) consoleBtn.classList.add('hidden');
 
-    // Show coordinator dedicated navigation
-    if (coordApprovalsBtn) coordApprovalsBtn.classList.remove('hidden');
+    // Show coordinator 3 dedicated tabs in order: Attendance, Leaderboard, Approvals
+    if (attendanceBtn) attendanceBtn.classList.remove('hidden');
     if (leaderboardBtn) leaderboardBtn.classList.remove('hidden');
-    if (coordMembersBtn) coordMembersBtn.classList.remove('hidden');
+    if (coordApprovalsBtn) coordApprovalsBtn.classList.remove('hidden');
 
     // Update coordinator opt-in badge
     const coordQueueCount = STATE.coordinatorOptedInQueue ? STATE.coordinatorOptedInQueue.length : 0;
@@ -703,15 +703,15 @@ function updateNavIcons(activeTab) {
       coordBadge.classList.toggle('hidden', coordQueueCount === 0);
     }
 
-    [coordApprovalsBtn, leaderboardBtn, coordMembersBtn].forEach(b => {
+    [attendanceBtn, leaderboardBtn, coordApprovalsBtn].forEach(b => {
       if (b) b.className = defaultBtnClass;
     });
 
-    if (activeTab === 'leaderboard' && leaderboardBtn) {
+    if (activeTab === 'attendance' && attendanceBtn) {
+      attendanceBtn.className = activeBtnClass;
+    } else if (activeTab === 'leaderboard' && leaderboardBtn) {
       leaderboardBtn.className = activeBtnClass;
-    } else if (activeTab === 'coordMembers' && coordMembersBtn) {
-      coordMembersBtn.className = activeBtnClass;
-    } else if (coordApprovalsBtn) {
+    } else if ((activeTab === 'coordinator' || activeTab === 'coordOptIns') && coordApprovalsBtn) {
       coordApprovalsBtn.className = activeBtnClass;
     }
   } else {
@@ -745,16 +745,15 @@ function switchNavTab(tab) {
       switchAdminTab('pending');
       return;
     }
-    if (STATE.currentUser && STATE.currentUser.role === 'coordinator') {
-      showScreen('coordinator');
-      loadCoordinatorData();
-      return;
-    }
     showScreen('attendance');
   } else if (tab === 'history') {
     if (STATE.currentUser && STATE.currentUser.role === 'admin') {
       showScreen('leaderboard');
       loadGlobalLeaderboard();
+      return;
+    }
+    if (STATE.currentUser && STATE.currentUser.role === 'coordinator') {
+      showScreen('attendance');
       return;
     }
     renderHistory();
@@ -765,10 +764,6 @@ function switchNavTab(tab) {
   } else if (tab === 'coordOptIns') {
     showScreen('coordinator');
     loadCoordinatorData();
-  } else if (tab === 'coordMembers') {
-    showScreen('admin');
-    setAdminTab('all');
-    loadAdminData();
   } else if (tab === 'admin') {
     if (STATE.currentUser && STATE.currentUser.role === 'admin') {
       loadAdminData();
@@ -896,10 +891,12 @@ async function loadUserProfile(userId) {
       return;
     }
 
-    // Coordinator routing!
+    // Coordinator routing: 1st page is Attendance check-in (same as normal users), approved by Admin
     if (profile.role === 'coordinator') {
-      showScreen('coordinator');
-      await loadCoordinatorData();
+      await loadTodayAttendance();
+      await loadAttendanceHistory();
+      loadCoordinatorData();
+      showScreen('attendance');
       return;
     }
 
@@ -1447,7 +1444,8 @@ async function handleOptInAttendance() {
 
     syncAttendanceButtonState();
     startOptInStatusWatcher();
-    showToast("⏳ Opted in! Waiting for Coordinator approval");
+    const isCoord = STATE.currentUser && STATE.currentUser.role === 'coordinator';
+    showToast(isCoord ? "⏳ Opted in! Waiting for Admin approval" : "⏳ Opted in! Waiting for Coordinator approval");
   } catch (err) {
     console.error('Opt-in failed:', err);
     showToast("Failed to opt in for attendance");
@@ -1506,7 +1504,8 @@ function onOptInApproved(record) {
 
   syncAttendanceButtonState();
   loadAttendanceHistory();
-  showToast("🎉 Attendance Approved by Coordinator!");
+  const isCoord = STATE.currentUser && STATE.currentUser.role === 'coordinator';
+  showToast(isCoord ? "🎉 Attendance Approved by Admin!" : "🎉 Attendance Approved by Coordinator!");
 }
 
 function startOptInStatusWatcher() {
@@ -1644,6 +1643,29 @@ function syncAttendanceButtonState() {
   if (optedInView) optedInView.classList.add('hidden');
   if (markedView) markedView.classList.add('hidden');
 
+  const isCoord = STATE.currentUser && STATE.currentUser.role === 'coordinator';
+  const optInHint = document.getElementById('optInHintTextSpan');
+  const optedInSub = document.getElementById('optedInSubtitle');
+  const optedInNotice = document.getElementById('optedInWaitingNotice');
+  const markedApprovalSub = document.getElementById('markedApprovalSubtitle');
+
+  if (optInHint) {
+    optInHint.textContent = isCoord 
+      ? "Tap to opt in for today. The Club Admin will verify & approve you."
+      : "Tap to opt in for today. A Coordinator will verify & approve you.";
+  }
+  if (optedInSub) {
+    optedInSub.textContent = isCoord ? "AWAITING ADMIN APPROVAL" : "AWAITING APPROVAL";
+  }
+  if (optedInNotice) {
+    optedInNotice.textContent = isCoord 
+      ? "Screen updates live once club admin approves your attendance."
+      : "Screen updates live once a club coordinator approves your attendance.";
+  }
+  if (markedApprovalSub) {
+    markedApprovalSub.textContent = isCoord ? "APPROVED BY ADMIN" : "APPROVED BY COORDINATOR";
+  }
+
   if (STATE.todayApproved) {
     if (markedView) markedView.classList.remove('hidden');
     if (statusBadge) {
@@ -1677,10 +1699,11 @@ function syncAttendanceButtonState() {
 }
 
 function pokeCompanionGhost() {
+  const isCoord = STATE.currentUser && STATE.currentUser.role === 'coordinator';
   const msg = STATE.todayApproved 
-    ? "✓ Your attendance is verified and approved for today!" 
+    ? (isCoord ? "✓ Your attendance is verified and approved by Admin!" : "✓ Your attendance is verified and approved for today!") 
     : STATE.todayOptedIn 
-      ? "⏳ Awaiting coordinator verification for today." 
+      ? (isCoord ? "⏳ Awaiting admin verification for today." : "⏳ Awaiting coordinator verification for today.") 
       : "Tap Opt-In to mark your daily club attendance.";
   showToast(msg);
 }
@@ -2895,7 +2918,7 @@ async function loadCoordinatorData() {
   try {
     const { data, error } = await STATE.supabase
       .from('attendance')
-      .select('*, profiles(name, identifier, roll_no, department, batch_year)')
+      .select('*, profiles(name, identifier, roll_no, department, batch_year, role)')
       .eq('attendance_date', todayStr)
       .eq('status', 'OPTED_IN')
       .order('created_at', { ascending: true });
@@ -2905,7 +2928,20 @@ async function loadCoordinatorData() {
       return;
     }
 
-    STATE.coordinatorOptedInQueue = data || [];
+    // Filter queue:
+    // 1. Coordinators should NOT approve themselves (their own attendance is approved by Admin)
+    // 2. Coordinators only approve normal students, not other coordinators or admins (admins approve coordinators)
+    const myId = STATE.currentUser ? STATE.currentUser.id : null;
+    const isCoord = STATE.currentUser && STATE.currentUser.role === 'coordinator';
+    if (isCoord) {
+      STATE.coordinatorOptedInQueue = (data || []).filter(item => {
+        if (item.user_id === myId) return false;
+        const r = item.profiles ? item.profiles.role : 'student';
+        return r !== 'coordinator' && r !== 'admin';
+      });
+    } else {
+      STATE.coordinatorOptedInQueue = data || [];
+    }
     renderCoordinatorQueue();
 
     // Set up Coordinator Realtime Queue listener once (live reactive queue without polling)
@@ -2943,6 +2979,13 @@ async function loadCoordinatorData() {
 function renderCoordinatorQueue() {
   const countEl = document.getElementById('coordOptedInCount');
   if (countEl) countEl.textContent = STATE.coordinatorOptedInQueue.length;
+
+  const coordBadge = document.getElementById('navCoordOptInBadge');
+  if (coordBadge) {
+    const qCount = STATE.coordinatorOptedInQueue.length;
+    coordBadge.textContent = qCount;
+    coordBadge.classList.toggle('hidden', qCount === 0);
+  }
 
   const container = document.getElementById('coordOptedInList');
   if (!container) return;
@@ -3086,20 +3129,40 @@ async function coordinatorApproveAllToday() {
 
   const todayStr = getTodayDateString();
   try {
-    let { error } = await STATE.supabase
-      .from('attendance')
-      .update({ status: 'PRESENT' })
-      .eq('attendance_date', todayStr)
-      .eq('status', 'OPTED_IN');
+    const isCoordinator = STATE.currentUser.role === 'coordinator';
 
-    // Fallback to RPC if direct update has RLS restriction
-    if (error) {
-      const rpcRes = await STATE.supabase.rpc('coordinator_approve_all_today', {
-        p_date: todayStr
-      });
-      if (rpcRes.error) {
-        showToast(rpcRes.error.message || error.message || "Failed to approve all");
+    if (isCoordinator) {
+      const queueIds = (STATE.coordinatorOptedInQueue || []).map(item => item.id);
+      if (queueIds.length === 0) {
+        showToast("No pending members in queue");
         return;
+      }
+
+      let { error } = await STATE.supabase
+        .from('attendance')
+        .update({ status: 'PRESENT' })
+        .in('id', queueIds);
+
+      if (error) {
+        showToast(error.message || "Failed to approve all");
+        return;
+      }
+    } else {
+      let { error } = await STATE.supabase
+        .from('attendance')
+        .update({ status: 'PRESENT' })
+        .eq('attendance_date', todayStr)
+        .eq('status', 'OPTED_IN');
+
+      // Fallback to RPC if direct update has RLS restriction
+      if (error) {
+        const rpcRes = await STATE.supabase.rpc('coordinator_approve_all_today', {
+          p_date: todayStr
+        });
+        if (rpcRes.error) {
+          showToast(rpcRes.error.message || error.message || "Failed to approve all");
+          return;
+        }
       }
     }
 

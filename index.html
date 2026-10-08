@@ -979,11 +979,11 @@
             </button>
             <p class="text-[11px] text-white/50 mt-5 font-medium flex items-center space-x-1.5 text-center px-4">
               <span class="w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_6px_#2F7FF5] shrink-0"></span>
-              <span>Tap to opt in for today. A Coordinator will verify & approve you.</span>
+              <span id="optInHintTextSpan">Tap to opt in for today. A Coordinator will verify & approve you.</span>
             </p>
           </div>
 
-          <!-- STATE B: OPTED IN (Awaiting Coordinator Approval) -->
+          <!-- STATE B: OPTED IN (Awaiting Coordinator / Admin Approval) -->
           <div id="optedInState" class="hidden w-full flex flex-col items-center screen-fade relative">
             <!-- Living Amber Pulsing Wave -->
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center -z-10">
@@ -1002,7 +1002,7 @@
                 </svg>
               </div>
               <span class="text-amber-300 font-black tracking-wider text-lg">⏳ OPTED IN</span>
-              <span class="text-[10px] font-bold text-amber-200/90 uppercase tracking-widest mt-0.5">AWAITING APPROVAL</span>
+              <span id="optedInSubtitle" class="text-[10px] font-bold text-amber-200/90 uppercase tracking-widest mt-0.5">AWAITING APPROVAL</span>
               <span id="optedInTimestamp" class="text-[11px] font-medium text-white/70 mt-1">Opted in at --:--</span>
             </div>
 
@@ -1016,7 +1016,7 @@
               </svg>
               <span>Cancel Today's Opt-In</span>
             </button>
-            <p class="text-[10px] text-white/40 mt-2 text-center max-w-[260px]">
+            <p id="optedInWaitingNotice" class="text-[10px] text-white/40 mt-2 text-center max-w-[260px]">
               Screen updates live once a club coordinator approves your attendance.
             </p>
           </div>
@@ -1036,7 +1036,7 @@
                 </svg>
               </div>
               <span class="text-white font-black tracking-wider text-xl">✓ PRESENT</span>
-              <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-widest mt-0.5">APPROVED BY COORDINATOR</span>
+              <span id="markedApprovalSubtitle" class="text-[10px] font-bold text-emerald-300 uppercase tracking-widest mt-0.5">APPROVED BY COORDINATOR</span>
               <span id="markedTimestamp" class="text-xs font-semibold text-white/80 mt-1">Logged today at 09:41 AM</span>
             </div>
 
@@ -1389,21 +1389,6 @@
         <span class="text-[10px] font-bold tracking-tight mt-1">History</span>
       </button>
 
-      <!-- COORDINATOR TAB 1: Opt-In Approvals Queue (Coordinators only) -->
-      <button 
-        id="tabCoordinatorApprovalsBtn" 
-        onclick="switchNavTab('coordOptIns')" 
-        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition hidden"
-      >
-        <div class="relative">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span id="navCoordOptInBadge" class="hidden absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-black">0</span>
-        </div>
-        <span class="text-[10px] font-bold tracking-tight mt-1">Opt-Ins</span>
-      </button>
-
       <!-- UNIVERSAL TAB: Leaderboard (For Members, Coordinators & Admin) -->
       <button 
         id="tabLeaderboardBtn" 
@@ -1418,18 +1403,19 @@
         <span class="text-[10px] font-bold tracking-tight mt-1">Leaderboard</span>
       </button>
 
-      <!-- COORDINATOR TAB 2: Members Directory (Coordinators only) -->
+      <!-- COORDINATOR TAB: Opt-In Approvals Queue (Coordinators only) -->
       <button 
-        id="tabCoordinatorMembersBtn" 
-        onclick="switchNavTab('coordMembers')" 
+        id="tabCoordinatorApprovalsBtn" 
+        onclick="switchNavTab('coordOptIns')" 
         class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition hidden"
       >
         <div class="relative">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
+          <span id="navCoordOptInBadge" class="hidden absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-black">0</span>
         </div>
-        <span class="text-[10px] font-bold tracking-tight mt-1">Members</span>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Approvals</span>
       </button>
 
       <!-- ADMIN TAB 1: Approvals Dashboard (Admin only) -->
@@ -1719,6 +1705,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
