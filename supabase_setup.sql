@@ -52,6 +52,21 @@ CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON public.attendance(user_id
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON public.attendance(attendance_date DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_date_status ON public.attendance(attendance_date DESC, status);
 
+-- Indexes for speedy profile queries and leaderboard performance (Supabase Free Tier optimized)
+CREATE INDEX IF NOT EXISTS idx_profiles_roll_no ON public.profiles(roll_no);
+CREATE INDEX IF NOT EXISTS idx_profiles_role_status ON public.profiles(role, approval_status);
+
+-- Enable Realtime publication for attendance so instant updates work with zero REST polling overhead
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'attendance'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance;
+  END IF;
+END $$;
+
 -- 5. HELPER FUNCTIONS FOR ROLES & PERMISSIONS
 -- 5a. Check if current authenticated user is Super Admin
 CREATE OR REPLACE FUNCTION public.is_admin()

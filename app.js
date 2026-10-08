@@ -27,6 +27,8 @@ const STATE = {
   // Coordinator State
   coordinatorOptedInQueue: [],
   optInPollTimer: null,
+  optInRealtimeChannel: null,
+  coordinatorRealtimeChannel: null,
   // Leaderboard State
   leaderboardUsers: [],
   leaderboardAttendance: [],
@@ -1283,13 +1285,21 @@ function copyTicketReference() {
 }
 
 async function handleLogout() {
+  stopOptInStatusWatcher();
+  if (STATE.coordinatorRealtimeChannel && STATE.supabase) {
+    try { STATE.supabase.removeChannel(STATE.coordinatorRealtimeChannel); } catch (e) {}
+    STATE.coordinatorRealtimeChannel = null;
+  }
   if (STATE.supabase) {
-    await STATE.supabase.auth.signOut();
+    try { await STATE.supabase.auth.signOut(); } catch (e) {}
   }
   STATE.isAuthenticated = false;
   STATE.currentUser = null;
   STATE.todayMarked = false;
+  STATE.todayOptedIn = false;
+  STATE.todayApproved = false;
   STATE.historyRecords = [];
+  localStorage.removeItem('MANAVAR_CACHED_USER');
   showToast("Logged out");
   showScreen('login');
 }
@@ -1446,10 +1456,72 @@ async function cancelTodayOptIn() {
   }
 }
 
+function onOptInApproved(record) {
+  stopOptInStatusWatcher();
+  STATE.todayApproved = true;
+  STATE.todayOptedIn = false;
+  STATE.todayMarked = true;
+  STATE.todayStatus = 'PRESENT';
+  
+  playChime(true);
+  triggerConfetti();
+
+  const stampElem = document.getElementById('markedTimestamp');
+  if (stampElem) stampElem.textContent = `Approved today at ${formatTimeString(record.created_at)}`;
+
+  syncAttendanceButtonState();
+  loadAttendanceHistory();
+  showToast("🎉 Attendance Approved by Coordinator!");
+}
+
 function startOptInStatusWatcher() {
   stopOptInStatusWatcher();
+  if (!STATE.todayAttendanceId || !STATE.supabase || !STATE.currentUser) return;
+
+  // 1. Supabase Realtime WebSocket Listener (0 REST request overhead on Free Tier)
+  try {
+    STATE.optInRealtimeChannel = STATE.supabase
+      .channel(`student-optin-${STATE.todayAttendanceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'attendance',
+          filter: `id=eq.${STATE.todayAttendanceId}`
+        },
+        (payload) => {
+          if (payload.new && payload.new.status === 'PRESENT') {
+            onOptInApproved(payload.new);
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✓ Realtime connected for student opt-in');
+        }
+      });
+  } catch (err) {
+    console.warn("Realtime listener fallback to polling:", err);
+  }
+
+  // 2. Battery & Quota-Friendly Polling Fallback (every 8s, pauses when tab hidden, stops after 15m)
+  let pollTicks = 0;
+  const maxPollTicks = 112; // ~15 minutes
+
   STATE.optInPollTimer = setInterval(async () => {
+    // If phone screen locked or tab minimized, pause polling to save battery and Supabase API calls
+    if (document.hidden) return;
+
+    pollTicks++;
+    if (pollTicks > maxPollTicks) {
+      stopOptInStatusWatcher();
+      console.log('Opt-in polling auto-paused after 15m idle');
+      return;
+    }
+
     if (!STATE.todayAttendanceId || !STATE.supabase || !STATE.currentUser) return;
+
     try {
       const { data, error } = await STATE.supabase
         .from('attendance')
@@ -1460,32 +1532,24 @@ function startOptInStatusWatcher() {
       if (error || !data) return;
 
       if (data.status === 'PRESENT') {
-        stopOptInStatusWatcher();
-        STATE.todayApproved = true;
-        STATE.todayOptedIn = false;
-        STATE.todayMarked = true;
-        STATE.todayStatus = 'PRESENT';
-        
-        playChime(true);
-        triggerConfetti();
-
-        const stampElem = document.getElementById('markedTimestamp');
-        if (stampElem) stampElem.textContent = `Approved today at ${formatTimeString(data.created_at)}`;
-
-        syncAttendanceButtonState();
-        await loadAttendanceHistory();
-        showToast("🎉 Attendance Approved by Coordinator!");
+        onOptInApproved(data);
       }
     } catch (e) {
       // Background poll
     }
-  }, 4000);
+  }, 8000);
 }
 
 function stopOptInStatusWatcher() {
   if (STATE.optInPollTimer) {
     clearInterval(STATE.optInPollTimer);
     STATE.optInPollTimer = null;
+  }
+  if (STATE.optInRealtimeChannel && STATE.supabase) {
+    try {
+      STATE.supabase.removeChannel(STATE.optInRealtimeChannel);
+    } catch (e) {}
+    STATE.optInRealtimeChannel = null;
   }
 }
 
@@ -2755,6 +2819,34 @@ async function loadCoordinatorData() {
 
     STATE.coordinatorOptedInQueue = data || [];
     renderCoordinatorQueue();
+
+    // Set up Coordinator Realtime Queue listener once (live reactive queue without polling)
+    if (!STATE.coordinatorRealtimeChannel && STATE.supabase) {
+      try {
+        STATE.coordinatorRealtimeChannel = STATE.supabase
+          .channel('coordinator-queue-feed')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'attendance'
+            },
+            (payload) => {
+              const currentToday = getTodayDateString();
+              const rec = payload.new || payload.old;
+              if (rec && rec.attendance_date === currentToday) {
+                if (STATE.currentScreen === 'coordinator') {
+                  loadCoordinatorData();
+                }
+              }
+            }
+          )
+          .subscribe();
+      } catch (e) {
+        console.warn("Coordinator realtime subscription:", e);
+      }
+    }
   } catch (err) {
     console.error("loadCoordinatorData error:", err);
   }
@@ -3232,4 +3324,16 @@ window.addEventListener('DOMContentLoaded', () => {
   setupPwa();
   checkAuthSession();
 });
+
+// Resume active state when browser tab becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && STATE.isAuthenticated) {
+    if (STATE.todayOptedIn) {
+      loadTodayAttendance();
+    } else if (STATE.currentScreen === 'coordinator') {
+      loadCoordinatorData();
+    }
+  }
+});
+
 
