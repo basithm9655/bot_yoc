@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manavar-illam-pwa-v14';
+const CACHE_NAME = 'manavar-illam-pwa-v15';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

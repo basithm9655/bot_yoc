@@ -768,6 +768,7 @@ function switchNavTab(tab) {
   } else if (tab === 'coordMembers') {
     showScreen('admin');
     setAdminTab('all');
+    loadAdminData();
   } else if (tab === 'admin') {
     if (STATE.currentUser && STATE.currentUser.role === 'admin') {
       loadAdminData();
@@ -1129,6 +1130,18 @@ async function handleSignup() {
 
   if (!name || !rollNo || !identityInput || !password) {
     showToast("Please fill in all required fields");
+    return;
+  }
+
+  // Strictly require valid email address (no phone numbers collected)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(identityInput)) {
+    showToast("Please enter a valid email address (e.g. name@gmail.com)");
+    const emailField = document.getElementById('signupIdentity');
+    if (emailField) {
+      emailField.focus();
+      emailField.classList.add('border-rose-500');
+    }
     return;
   }
 
@@ -1899,38 +1912,74 @@ function renderHistory() {
 // 7. ADMIN AREA: USER MANAGEMENT, APPROVAL, DELETE & CSV EXPORT
 // ------------------------------------------------------------------------------
 async function loadAdminData() {
-  if (!STATE.currentUser || STATE.currentUser.role !== 'admin' || !STATE.supabase) return;
+  if (!STATE.currentUser || (STATE.currentUser.role !== 'admin' && STATE.currentUser.role !== 'coordinator') || !STATE.supabase) return;
+
+  const isCoordinator = STATE.currentUser.role === 'coordinator';
 
   try {
-    // 1. Fetch all profiles
-    const { data: users, error: userErr } = await STATE.supabase
+    // 1. Fetch profiles
+    let userQuery = STATE.supabase
       .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
 
+    if (isCoordinator) {
+      // Coordinator view: ONLY fetch normal users (do NOT fetch or show admin or coordinators)
+      userQuery = userQuery.neq('role', 'admin').neq('role', 'coordinator').order('name', { ascending: true });
+    } else {
+      userQuery = userQuery.order('created_at', { ascending: false });
+    }
+
+    const { data: users, error: userErr } = await userQuery;
     if (userErr) throw userErr;
 
     STATE.adminUsers = users || [];
     STATE.adminPendingUsers = STATE.adminUsers.filter(u => u.approval_status === 'pending');
 
-    // 2. Fetch all attendance records (with member profiles)
-    const { data: records, error: attErr } = await STATE.supabase
-      .from('attendance')
-      .select('*, profiles(name, identifier, roll_no, department, batch_year)')
-      .order('attendance_date', { ascending: false });
+    // 2. Fetch all attendance records (with member profiles) - only for admin
+    if (!isCoordinator) {
+      const { data: records, error: attErr } = await STATE.supabase
+        .from('attendance')
+        .select('*, profiles(name, identifier, roll_no, department, batch_year, role)')
+        .order('attendance_date', { ascending: false });
 
-    if (attErr) throw attErr;
-
-    STATE.adminAttendance = records || [];
+      if (attErr) throw attErr;
+      STATE.adminAttendance = records || [];
+    } else {
+      STATE.adminAttendance = [];
+    }
 
     renderAdminUI();
   } catch (err) {
-    console.error('Failed to load admin data:', err);
-    showToast("Error loading admin data: " + err.message);
+    console.error('Failed to load admin/members data:', err);
+    showToast("Error loading members: " + err.message);
   }
 }
 
 function renderAdminUI() {
+  const isCoordinator = STATE.currentUser && STATE.currentUser.role === 'coordinator';
+
+  // Customize header for coordinator vs admin
+  const badgeText = document.getElementById('adminHeaderBadgeText');
+  const titleElem = document.getElementById('adminHeaderTitle');
+  const subtitleElem = document.getElementById('adminHeaderSubtitle');
+  const wipeBtn = document.getElementById('adminWipeDataBtn');
+  const tabsBar = document.getElementById('adminSegmentedTabs');
+
+  if (isCoordinator) {
+    if (badgeText) badgeText.textContent = "Club Members Directory";
+    if (titleElem) titleElem.textContent = "Club Members";
+    if (subtitleElem) subtitleElem.textContent = "Directory of registered club students";
+    if (wipeBtn) wipeBtn.classList.add('hidden');
+    if (tabsBar) tabsBar.classList.add('hidden');
+    STATE.adminActiveTab = 'all'; // Always show members list for coordinators
+  } else {
+    if (badgeText) badgeText.textContent = "Club Admin Console";
+    if (titleElem) titleElem.textContent = "Club Management";
+    if (subtitleElem) subtitleElem.textContent = "Approve members, review daily club logs, & export CSV";
+    if (wipeBtn) wipeBtn.classList.remove('hidden');
+    if (tabsBar) tabsBar.classList.remove('hidden');
+  }
+
   // Update header capacity counter (total registered members)
   const capacityElem = document.getElementById('adminCapacityCount');
   const count = STATE.adminUsers.length;
@@ -1958,7 +2007,7 @@ function renderAdminUI() {
   container.innerHTML = '';
 
   // -------------------------------------------------------------
-  // VIEW 1: APPROVAL DASHBOARD ('pending')
+  // VIEW 1: APPROVAL DASHBOARD ('pending') - ADMIN ONLY
   // -------------------------------------------------------------
   if (STATE.adminActiveTab === 'pending') {
     const pendingList = STATE.adminPendingUsers || [];
@@ -2013,6 +2062,7 @@ function renderAdminUI() {
                 <div class="flex items-center space-x-1.5 flex-wrap">
                   <span class="text-sm font-bold text-white truncate">${u.name}</span>
                   ${u.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">${u.roll_no}</span>` : ''}
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center space-x-1"><span>🎖️</span><span>Coordinator</span></span>
                 </div>
                 <p class="text-[11px] text-white/60 truncate mt-0.5">
                   ${u.department ? `${u.department} • ` : ''}${u.batch_year ? `${u.batch_year} Batch` : ''}
@@ -2062,6 +2112,7 @@ function renderAdminUI() {
             <div class="flex items-center space-x-1.5">
               <span class="text-xs font-bold text-white truncate">${c.name}</span>
               ${c.roll_no ? `<span class="text-[10px] font-mono text-blue-300 font-bold">${c.roll_no}</span>` : ''}
+              <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">Coordinator</span>
             </div>
             <p class="text-[10px] text-white/50 truncate">${c.department || 'Coordinator'}</p>
           </div>
@@ -2099,7 +2150,11 @@ function renderAdminUI() {
       `;
 
       optedInToday.forEach(item => {
-        const u = (STATE.adminUsers || []).find(usr => usr.id === item.user_id) || { name: 'Member', roll_no: '' };
+        const u = (STATE.adminUsers || []).find(usr => usr.id === item.user_id) || { name: 'Member', roll_no: '', role: 'student' };
+        const uRoleBadge = u.role === 'coordinator' 
+          ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Coordinator</span>' 
+          : '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">Normal User</span>';
+
         const card = document.createElement('div');
         card.className = 'zentra-card p-3 rounded-2xl border border-amber-400/30 flex items-center justify-between space-x-2';
         card.innerHTML = `
@@ -2107,6 +2162,7 @@ function renderAdminUI() {
             <div class="flex items-center space-x-1.5">
               <span class="text-xs font-bold text-white truncate">${u.name}</span>
               ${u.roll_no ? `<span class="text-[10px] font-mono text-blue-300 font-bold">${u.roll_no}</span>` : ''}
+              ${uRoleBadge}
             </div>
             <p class="text-[10px] text-white/50 truncate">Opted in at ${formatTimeString(item.created_at)}</p>
           </div>
@@ -2155,6 +2211,7 @@ function renderAdminUI() {
                 <div class="flex items-center space-x-1.5 flex-wrap">
                   <span class="text-sm font-bold text-white truncate">${user.name}</span>
                   ${user.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/25 text-blue-300 border border-blue-500/30">${user.roll_no}</span>` : ''}
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 flex items-center space-x-1"><span>👤</span><span>Normal User</span></span>
                 </div>
                 <p class="text-[11px] text-white/60 truncate mt-0.5">
                   ${user.department ? `${user.department} • ` : ''}${user.batch_year ? `${user.batch_year} Batch` : ''}
@@ -2268,6 +2325,10 @@ function renderAdminUI() {
         rankBadgeHtml = `<span class="w-6 h-6 rounded-lg bg-white/10 text-white/80 font-mono text-xs font-bold flex items-center justify-center">#${rank}</span>`;
       }
 
+      const roleBadge = member.role === 'coordinator' 
+        ? '<span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center space-x-1"><span>🎖️</span><span>Coordinator</span></span>' 
+        : '<span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 flex items-center space-x-1"><span>👤</span><span>Normal User</span></span>';
+
       const card = document.createElement('div');
       card.className = `zentra-card-elevated p-3.5 rounded-2xl border ${cardBorderClass} space-y-2.5`;
       card.innerHTML = `
@@ -2278,6 +2339,7 @@ function renderAdminUI() {
               <div class="flex items-center space-x-1.5 flex-wrap">
                 <span class="text-sm font-bold text-white truncate">${member.name}</span>
                 ${member.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">${member.roll_no}</span>` : ''}
+                ${roleBadge}
               </div>
               <p class="text-[11px] text-white/50 truncate mt-0.5">
                 ${member.department ? `${member.department} • ` : ''}${member.batch_year ? `${member.batch_year} Batch` : ''}
@@ -2303,7 +2365,7 @@ function renderAdminUI() {
   }
 
   // -------------------------------------------------------------
-  // VIEW 3: ATTENDANCE LOGS ('attendance')
+  // VIEW 3: ATTENDANCE LOGS ('attendance') - ADMIN ONLY
   // -------------------------------------------------------------
   if (STATE.adminActiveTab === 'attendance') {
     if (STATE.adminAttendance.length === 0) {
@@ -2320,6 +2382,10 @@ function renderAdminUI() {
       const memberDept = (rec.profiles && rec.profiles.department) || '';
       const dateLabel = formatDateLabel(rec.attendance_date);
       const timeLabel = formatTimeString(rec.created_at);
+      const attendeeRole = (rec.profiles && rec.profiles.role) || 'student';
+      const attendeeRoleBadge = attendeeRole === 'coordinator' 
+        ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Coordinator</span>' 
+        : '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">Normal User</span>';
 
       const row = document.createElement('div');
       row.className = 'zentra-card-elevated p-3.5 rounded-2xl flex items-center justify-between border border-white/10';
@@ -2332,6 +2398,7 @@ function renderAdminUI() {
             <div class="flex items-center space-x-1.5 truncate">
               <p class="text-sm font-bold text-white truncate">${memberName}</p>
               ${memberRoll ? `<span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">${memberRoll}</span>` : ''}
+              ${attendeeRoleBadge}
             </div>
             <p class="text-[11px] text-white/50 truncate">${memberDept ? `${memberDept} • ` : ''}${dateLabel} at ${timeLabel}</p>
           </div>
@@ -2349,14 +2416,18 @@ function renderAdminUI() {
 
   // -------------------------------------------------------------
   // VIEW 4: ALL MEMBERS LIST ('all')
+  // For Coordinator: ONLY show normal users (exclude admin and coordinators; no delete button).
+  // For Admin: show all members with their roles (Admin, Coordinator, Normal User) and admin actions.
   // -------------------------------------------------------------
-  const listToRender = STATE.adminUsers;
+  const listToRender = isCoordinator
+    ? STATE.adminUsers.filter(u => u.role !== 'admin' && u.role !== 'coordinator')
+    : STATE.adminUsers;
 
   if (listToRender.length === 0) {
     container.innerHTML = `
       <div class="py-12 flex flex-col items-center justify-center text-center px-4">
         <p class="text-sm font-bold text-white">No members found</p>
-        <p class="text-xs text-white/50 mt-1 max-w-[240px]">No registered club members in database.</p>
+        <p class="text-xs text-white/50 mt-1 max-w-[240px]">${isCoordinator ? 'No registered club students found.' : 'No registered club members in database.'}</p>
       </div>
     `;
     return;
@@ -2368,6 +2439,16 @@ function renderAdminUI() {
   listToRender.forEach(user => {
     const isPending = user.approval_status === 'pending';
     const isAdminUser = user.role === 'admin';
+    const isUserCoord = user.role === 'coordinator';
+
+    let roleBadgeHtml = '';
+    if (isAdminUser) {
+      roleBadgeHtml = '<span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center space-x-1"><span>👑</span><span>Admin</span></span>';
+    } else if (isUserCoord) {
+      roleBadgeHtml = '<span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center space-x-1"><span>🎖️</span><span>Coordinator</span></span>';
+    } else {
+      roleBadgeHtml = '<span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 flex items-center space-x-1"><span>👤</span><span>Normal User</span></span>';
+    }
 
     const card = document.createElement('div');
     card.className = 'zentra-card-elevated p-3.5 rounded-2xl border border-white/10 space-y-2.5';
@@ -2377,7 +2458,7 @@ function renderAdminUI() {
           <div class="flex items-center space-x-1.5 flex-wrap">
             <span class="text-sm font-bold text-white truncate">${user.name}</span>
             ${user.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">${user.roll_no}</span>` : ''}
-            ${isAdminUser ? '<span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Admin</span>' : ''}
+            ${roleBadgeHtml}
           </div>
           <p class="text-[11px] text-white/50 truncate mt-0.5">
             ${user.department ? `${user.department} • ` : ''}${user.batch_year ? `${user.batch_year} Batch • ` : ''}${user.identifier}
@@ -2392,18 +2473,26 @@ function renderAdminUI() {
         </span>
       </div>
 
-      <div class="flex items-center justify-end space-x-2 pt-1 border-t border-white/[0.05]">
-        ${isPending ? `
-          <button onclick="adminApproveUser('${user.id}')" class="tap-scale px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold transition shadow-sm">
-            ✓ Approve
-          </button>
-        ` : ''}
-        ${!isAdminUser ? `
-          <button onclick="openAdminDeleteModal('${user.id}', '${encodeURIComponent(user.name)}')" class="tap-scale px-3 py-1.5 rounded-xl bg-[#FF453A]/15 text-[#FF453A] border border-[#FF453A]/30 text-xs font-bold hover:bg-[#FF453A]/25 transition">
-            Delete
-          </button>
-        ` : ''}
-      </div>
+      <!-- Action buttons: STRICTLY FOR ADMIN ONLY (Coordinators cannot delete or alter members) -->
+      ${!isCoordinator ? `
+        <div class="flex items-center justify-end space-x-2 pt-1 border-t border-white/[0.05]">
+          ${!isAdminUser ? `
+            <button onclick="adminToggleUserRole('${user.id}', '${user.role || 'student'}')" class="tap-scale px-2.5 py-1.5 rounded-xl ${isUserCoord ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25' : 'bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25'} text-xs font-bold transition flex items-center space-x-1">
+              <span>${isUserCoord ? '👤 Set Normal User' : '🎖️ Make Coordinator'}</span>
+            </button>
+          ` : ''}
+          ${isPending ? `
+            <button onclick="adminApproveUser('${user.id}')" class="tap-scale px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold transition shadow-sm">
+              ✓ Approve
+            </button>
+          ` : ''}
+          ${!isAdminUser ? `
+            <button onclick="openAdminDeleteModal('${user.id}', '${encodeURIComponent(user.name)}')" class="tap-scale px-3 py-1.5 rounded-xl bg-[#FF453A]/15 text-[#FF453A] border border-[#FF453A]/30 text-xs font-bold hover:bg-[#FF453A]/25 transition">
+              Delete
+            </button>
+          ` : ''}
+        </div>
+      ` : ''}
     `;
     list.appendChild(card);
   });
@@ -2551,6 +2640,10 @@ async function executeDataWipe() {
 }
 
 function openAdminDeleteModal(userId, encodedName) {
+  if (!STATE.currentUser || STATE.currentUser.role !== 'admin') {
+    showToast("Unauthorized: Only Admin can delete members");
+    return;
+  }
   STATE.userToDelete = { id: userId, name: decodeURIComponent(encodedName) };
   const modal = document.getElementById('adminDeleteModal');
   const nameText = document.getElementById('adminDeleteUserName');
@@ -2565,6 +2658,10 @@ function closeAdminDeleteModal() {
 }
 
 async function confirmAdminDeleteUser() {
+  if (!STATE.currentUser || STATE.currentUser.role !== 'admin') {
+    showToast("Unauthorized: Only Admin can delete members");
+    return;
+  }
   if (!STATE.userToDelete || !STATE.supabase) return;
   const targetId = STATE.userToDelete.id;
   closeAdminDeleteModal();
@@ -2612,8 +2709,8 @@ async function downloadAttendanceCSV() {
       return;
     }
 
-    // CSV Header row including academic fields
-    const headers = ['Member Name', 'Roll Number', 'Department', 'Batch Year', 'Email or Phone', 'Date', 'Attendance Status', 'Attendance Time'];
+    // CSV Header row including academic fields & role
+    const headers = ['Member Name', 'Roll Number', 'Role', 'Department', 'Batch Year', 'Email', 'Date', 'Attendance Status', 'Attendance Time'];
     const rows = [headers];
 
     // Build data rows
@@ -2621,14 +2718,15 @@ async function downloadAttendanceCSV() {
       const p = rec.profiles || {};
       const name = p.name ? `"${p.name.replace(/"/g, '""')}"` : '""';
       const roll = p.roll_no ? `"${p.roll_no.replace(/"/g, '""')}"` : '""';
+      const roleStr = p.role === 'coordinator' ? '"Coordinator"' : (p.role === 'admin' ? '"Admin"' : '"Normal User"');
       const dept = p.department ? `"${p.department.replace(/"/g, '""')}"` : '""';
       const year = p.batch_year ? `"${p.batch_year.replace(/"/g, '""')}"` : '""';
-      const identifier = p.identifier ? `"${p.identifier.replace(/"/g, '""')}"` : '""';
+      const email = p.identifier ? `"${p.identifier.replace(/"/g, '""')}"` : '""';
       const date = `"${rec.attendance_date}"`;
       const status = `"${rec.status || 'PRESENT'}"`;
       const time = `"${formatTimeString(rec.created_at)}"`;
 
-      rows.push([name, roll, dept, year, identifier, date, status, time]);
+      rows.push([name, roll, roleStr, dept, year, email, date, status, time]);
     });
 
     const csvContent = '\uFEFF' + rows.map(r => r.join(',')).join('\r\n'); // \uFEFF BOM for Excel utf-8 support
@@ -3068,6 +3166,39 @@ async function adminApproveCoordinator(coordinatorId) {
   } catch (err) {
     console.error("adminApproveCoordinator error:", err);
     showToast("Failed to approve coordinator: " + err.message);
+  } finally {
+    hideGhostLoading();
+  }
+}
+
+async function adminToggleUserRole(userId, currentRole) {
+  if (!STATE.currentUser || STATE.currentUser.role !== 'admin' || !STATE.supabase) {
+    showToast("Admin access required");
+    return;
+  }
+
+  const newRole = currentRole === 'coordinator' ? 'student' : 'coordinator';
+  const roleTitle = newRole === 'coordinator' ? 'Coordinator' : 'Normal User';
+  const isPromoting = newRole === 'coordinator';
+
+  showGhostLoading(`Updating user to ${roleTitle}...`);
+  try {
+    const { error } = await STATE.supabase
+      .from('profiles')
+      .update({
+        role: newRole,
+        can_approve_attendance: isPromoting ? true : false
+      })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    playChime(true);
+    showToast(isPromoting ? "✓ Promoted to Coordinator" : "✓ Changed to Normal User");
+    await loadAdminData();
+  } catch (err) {
+    console.error("adminToggleUserRole error:", err);
+    showToast("Failed to update role: " + err.message);
   } finally {
     hideGhostLoading();
   }
