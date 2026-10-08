@@ -920,10 +920,10 @@ async function handleLogin() {
   }
 
   const identityInput = document.getElementById('loginIdentity').value.trim();
-  const password = document.getElementById('loginPassword').value;
+  const rawPassword = (document.getElementById('loginPassword')?.value || '').trim();
   const loginBtn = document.querySelector('#loginForm button[type="submit"]');
 
-  if (!identityInput || !password) {
+  if (!identityInput || !rawPassword) {
     showToast("Please enter email/roll no and password");
     return;
   }
@@ -962,10 +962,29 @@ async function handleLogin() {
       }
     }
 
-    const { data, error } = await STATE.supabase.auth.signInWithPassword({
+    const lowerPassword = rawPassword.toLowerCase();
+
+    // 1. Attempt login with case-insensitive (lowercased) password
+    let { data, error } = await STATE.supabase.auth.signInWithPassword({
       email: authEmailToUse,
-      password: password
+      password: lowerPassword
     });
+
+    // 2. Fallback: If user previously registered with uppercase password, try exact typed casing
+    if (error && lowerPassword !== rawPassword) {
+      const fallbackRes = await STATE.supabase.auth.signInWithPassword({
+        email: authEmailToUse,
+        password: rawPassword
+      });
+      if (!fallbackRes.error && fallbackRes.data) {
+        data = fallbackRes.data;
+        error = null;
+        // Auto-migrate account password to lowercase so both A and a work in all future logins
+        try {
+          await STATE.supabase.auth.updateUser({ password: lowerPassword });
+        } catch (migErr) {}
+      }
+    }
 
     if (error) {
       showToast(error.message || "Invalid login credentials");
@@ -1017,8 +1036,8 @@ function checkPasswordMatch() {
   const statusText = document.getElementById('passwordMatchText');
   if (!p1Elem || !p2Elem || !statusBox || !statusIcon || !statusText) return;
 
-  const p1 = p1Elem.value;
-  const p2 = p2Elem.value;
+  const p1 = (p1Elem.value || '').trim();
+  const p2 = (p2Elem.value || '').trim();
 
   if (!p1 && !p2) {
     statusBox.classList.add('hidden');
@@ -1041,7 +1060,8 @@ function checkPasswordMatch() {
   }
 
   if (p2.length > 0) {
-    if (p1 === p2) {
+    // Case-insensitive match (A and a treated the same)
+    if (p1.toLowerCase() === p2.toLowerCase()) {
       statusBox.className = "px-2.5 py-1 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25";
       statusIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>`;
       statusText.textContent = "✓ Passwords match";
@@ -1101,8 +1121,10 @@ async function handleSignup() {
   const batchYear = (document.getElementById('signupYear')?.value || '').trim();
   const signupRole = (document.getElementById('signupRole')?.value || 'student').trim();
   const identityInput = document.getElementById('signupIdentity').value.trim();
-  const password = document.getElementById('signupPassword').value;
-  const confirmPassword = document.getElementById('signupConfirm').value;
+  const rawPassword = (document.getElementById('signupPassword')?.value || '').trim();
+  const rawConfirm = (document.getElementById('signupConfirm')?.value || '').trim();
+  const password = rawPassword.toLowerCase();
+  const confirmPassword = rawConfirm.toLowerCase();
   const signupBtn = document.querySelector('#signupForm button[type="submit"]');
 
   if (!name || !rollNo || !identityInput || !password) {

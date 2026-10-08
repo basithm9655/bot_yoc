@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manavar-illam-pwa-v13';
+const CACHE_NAME = 'manavar-illam-pwa-v14';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,7 +10,8 @@ const ASSETS_TO_CACHE = [
   './icons/icon-512.png',
   './icons/icon-maskable.png',
   './icons/apple-touch-icon.png',
-  './icons/favicon.png'
+  './icons/favicon.png',
+  './icons/yoc-logo.png'
 ];
 
 self.addEventListener('install', (event) => {
