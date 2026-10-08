@@ -1603,7 +1603,7 @@ function syncAttendanceButtonState() {
   const unmarkedView = document.getElementById('unmarkedState');
   const optedInView = document.getElementById('optedInState');
   const markedView = document.getElementById('markedState');
-  const companion = document.getElementById('attendanceGhostCompanion');
+  const statusBadge = document.getElementById('attendanceGhostCompanion');
 
   if (unmarkedView) unmarkedView.classList.add('hidden');
   if (optedInView) optedInView.classList.add('hidden');
@@ -1611,21 +1611,30 @@ function syncAttendanceButtonState() {
 
   if (STATE.todayApproved) {
     if (markedView) markedView.classList.remove('hidden');
-    if (companion) {
-      companion.classList.remove('ghost-float');
-      companion.classList.add('ghost-celebrate');
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="text-xs font-bold tracking-wide text-emerald-300">Present</span>
+      `;
+      statusBadge.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30";
     }
   } else if (STATE.todayOptedIn) {
     if (optedInView) optedInView.classList.remove('hidden');
-    if (companion) {
-      companion.classList.remove('ghost-celebrate');
-      companion.classList.add('ghost-float');
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+        <span class="text-xs font-bold tracking-wide text-amber-300">Opted In</span>
+      `;
+      statusBadge.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30";
     }
   } else {
     if (unmarkedView) unmarkedView.classList.remove('hidden');
-    if (companion) {
-      companion.classList.remove('ghost-celebrate');
-      companion.classList.add('ghost-float');
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-[#529BF8] animate-pulse"></span>
+        <span class="text-xs font-bold tracking-wide text-[#529BF8]">Ready</span>
+      `;
+      statusBadge.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 text-[#529BF8]";
     }
   }
   updateDynamicIsland();
@@ -1633,24 +1642,11 @@ function syncAttendanceButtonState() {
 }
 
 function pokeCompanionGhost() {
-  const companion = document.getElementById('attendanceGhostCompanion');
-  if (companion) {
-    companion.classList.remove('ghost-float');
-    companion.classList.add('ghost-celebrate');
-    setTimeout(() => {
-      if (!STATE.todayMarked) {
-        companion.classList.remove('ghost-celebrate');
-        companion.classList.add('ghost-float');
-      }
-    }, 2800);
-  }
-  const quotes = [
-    "Manavar Illam mascot is rooting for you! ✨",
-    "Keep up your great attendance streak! 💙",
-    "One tap each day builds great habits! 🚀",
-    "Proud of your dedication to Manavar Illam! 🌟"
-  ];
-  const msg = quotes[Math.floor(Math.random() * quotes.length)];
+  const msg = STATE.todayApproved 
+    ? "✓ Your attendance is verified and approved for today!" 
+    : STATE.todayOptedIn 
+      ? "⏳ Awaiting coordinator verification for today." 
+      : "Tap Opt-In to mark your daily club attendance.";
   showToast(msg);
 }
 
@@ -1815,21 +1811,11 @@ function renderHistory() {
   if (months.length === 0) {
     container.innerHTML = `
       <div class="py-12 flex flex-col items-center justify-center text-center px-4">
-        <div class="w-20 h-20 relative mb-3 ghost-float">
-          <svg class="w-20 h-20 drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]" viewBox="0 0 120 120" fill="none">
-            <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-            <path d="M38 34C44 26 53 22 62 22C71 22 79 25 84 31" stroke="url(#sheenEdge)" stroke-linecap="round" stroke-width="2.5"></path>
-            <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-            <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-            <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-          </svg>
+        <div class="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-2xl mb-3 shadow-inner">
+          📅
         </div>
-        <p class="text-sm font-bold text-white">No records found</p>
-        <p class="text-xs text-white/50 mt-1 max-w-[240px]">Mark today's attendance to start your verified check-in history!</p>
+        <p class="text-sm font-bold text-white">No Records Found</p>
+        <p class="text-xs text-white/50 mt-1 max-w-[240px]">Opt in to today's session to start your verified check-in history!</p>
       </div>
     `;
     return;
@@ -1965,17 +1951,8 @@ function renderAdminUI() {
     if (!hasAnyWork) {
       container.innerHTML = `
         <div class="py-12 flex flex-col items-center justify-center text-center px-4">
-          <div class="w-24 h-24 relative mb-3 ghost-float">
-            <svg class="w-24 h-24 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" viewBox="0 0 120 120" fill="none">
-              <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-              <ellipse cx="50" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-              <ellipse cx="70" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-              <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-              <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-              <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-            </svg>
+          <div class="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-2xl mb-3 shadow-inner">
+            ✓
           </div>
           <p class="text-base font-bold text-white">Queue Clear!</p>
           <p class="text-xs text-white/50 mt-1 max-w-[260px]">All registered members and coordinators are approved and up to date.</p>
@@ -2218,17 +2195,8 @@ function renderAdminUI() {
     if (rankedList.length === 0 || STATE.adminAttendance.length === 0) {
       container.innerHTML = `
         <div class="py-12 flex flex-col items-center justify-center text-center px-4">
-          <div class="w-24 h-24 relative mb-3 ghost-float">
-            <svg class="w-24 h-24 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" viewBox="0 0 120 120" fill="none">
-              <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-              <ellipse cx="50" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-              <ellipse cx="70" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-              <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-              <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-              <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-            </svg>
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-2xl mb-3 shadow-inner">
+            🏆
           </div>
           <p class="text-base font-bold text-white">No Attendance Marked Yet</p>
           <p class="text-xs text-white/50 mt-1 max-w-[260px]">Members will automatically appear on the ranked leaderboard as soon as daily attendance is checked in.</p>
@@ -2865,17 +2833,8 @@ function renderCoordinatorQueue() {
   if (STATE.coordinatorOptedInQueue.length === 0) {
     container.innerHTML = `
       <div class="py-12 flex flex-col items-center justify-center text-center px-4">
-        <div class="w-20 h-20 relative mb-3 ghost-float">
-          <svg class="w-20 h-20 drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]" viewBox="0 0 120 120" fill="none">
-            <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-            <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-            <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-            <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-          </svg>
+        <div class="w-14 h-14 rounded-2xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-2xl mb-3 shadow-inner">
+          📋
         </div>
         <p class="text-sm font-bold text-white">Queue Clear!</p>
         <p class="text-xs text-white/50 mt-1 max-w-[240px]">No members are waiting for attendance verification right now.</p>

@@ -239,31 +239,19 @@
       pointer-events: none;
     }
 
-    /* Cute Ghost Floating & Pulsing Animations */
-    @keyframes ghostBob {
+    /* Clean Ambient Glow Pulse */
+    @keyframes ambientGlowPulse {
       0%, 100% {
-        transform: translateY(0px) rotate(0deg);
-      }
-      50% {
-        transform: translateY(-9px) rotate(1.8deg);
-      }
-    }
-    .ghost-float {
-      animation: ghostBob 4.2s ease-in-out infinite;
-    }
-
-    @keyframes ghostAuraPulse {
-      0%, 100% {
-        opacity: 0.30;
-        transform: scale(0.96);
+        opacity: 0.35;
+        transform: scale(0.98);
       }
       50% {
         opacity: 0.65;
-        transform: scale(1.1);
+        transform: scale(1.04);
       }
     }
-    .ghost-aura {
-      animation: ghostAuraPulse 3.8s ease-in-out infinite;
+    .ambient-glow {
+      animation: ambientGlowPulse 4s ease-in-out infinite;
     }
 
     /* Ambient spirit drift */
@@ -295,18 +283,6 @@
     }
     .ripple-wave-2 {
       animation: rippleWave 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite 1.5s;
-    }
-
-    /* Cute Ghost Mascot Happy Celebration Dance */
-    @keyframes ghostCelebrate {
-      0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-      20% { transform: translateY(-7px) rotate(-6deg) scale(1.06); }
-      40% { transform: translateY(-3px) rotate(4deg) scale(1.04); }
-      60% { transform: translateY(-8px) rotate(-4deg) scale(1.06); }
-      80% { transform: translateY(-2px) rotate(2deg) scale(1.02); }
-    }
-    .ghost-celebrate {
-      animation: ghostCelebrate 2.6s ease-in-out infinite;
     }
 
     /* Staggered Card Slide-Up Entrance */
@@ -378,32 +354,18 @@
     <!-- Native App Splash / Initializing Screen -->
     <div id="appSplashScreen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#04060A] transition-opacity duration-300">
       <div class="relative flex flex-col items-center text-center px-6">
-        <!-- Ambient glowing sapphire aura -->
-        <div class="absolute w-48 h-48 rounded-full bg-[#2F7FF5]/25 blur-3xl -z-10 animate-pulse"></div>
+        <!-- Ambient glowing sapphire back-glow -->
+        <div class="absolute w-44 h-44 rounded-full bg-[#2F7FF5]/20 blur-3xl -z-10 animate-pulse"></div>
         
-        <!-- Floating Frosted Glass Ghost Mascot -->
-        <div class="w-24 h-24 relative mb-4 ghost-float">
-          <svg class="w-24 h-24 drop-shadow-[0_12px_24px_rgba(0,0,0,0.7)]" fill="none" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="splashGhostGrad" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#EAF2FF" stop-opacity="0.95"></stop>
-                <stop offset="50%" stop-color="#8EBFFF" stop-opacity="0.80"></stop>
-                <stop offset="100%" stop-color="#1E4482" stop-opacity="0.65"></stop>
-              </linearGradient>
-            </defs>
-            <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#splashGhostGrad)"></path>
-            <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-            <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-            <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-            <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-          </svg>
+        <!-- YOC Club Logo Centerpiece -->
+        <div class="relative w-20 h-20 mb-4 flex items-center justify-center">
+          <div class="relative w-20 h-20 rounded-2xl p-2 bg-gradient-to-b from-white/[0.1] to-white/[0.02] border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.6)] flex items-center justify-center backdrop-blur-md">
+            <img src="icons/yoc-logo.png" alt="YOC" class="w-full h-full object-contain drop-shadow">
+          </div>
         </div>
 
-        <h2 class="text-lg font-extrabold text-white tracking-tight">Manavar Illam</h2>
-        <p class="text-xs text-[#529BF8] font-medium mt-0.5 tracking-wide">Club Attendance Tracker</p>
+        <h2 class="text-xl font-black text-white tracking-tight">Manavar Illam</h2>
+        <p class="text-xs text-[#529BF8] font-semibold mt-0.5 tracking-wide">Club Attendance Tracker</p>
 
         <!-- Loading indicator -->
         <div class="mt-6 flex items-center space-x-2">
@@ -446,7 +408,7 @@
       <!-- ============================================== -->
       <section id="screenLogin" class="hidden flex-1 flex-col justify-between px-6 py-6 screen-fade overflow-y-auto no-scrollbar relative">
         <!-- Ambient Sapphire Photonic Halo Background -->
-        <div class="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-[#2F7FF5]/25 via-[#1D6FE5]/10 to-transparent blur-3xl -z-10 ghost-aura"></div>
+        <div class="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-[#2F7FF5]/25 via-[#1D6FE5]/10 to-transparent blur-3xl -z-10 ambient-glow"></div>
 
         <div>
 
@@ -623,7 +585,7 @@
               >
             </div>
 
-            <!-- Roll Number Input with Ghost Auto-Detect -->
+            <!-- Roll Number Input with Department Auto-Detect -->
             <div>
               <div class="flex items-center justify-between mb-1 pl-1">
                 <label class="text-[11px] font-semibold uppercase tracking-wider text-white/60">Roll Number</label>
@@ -648,11 +610,11 @@
                 </div>
               </div>
 
-              <!-- Live Ethereal Ghost Auto-Detection Badge -->
+              <!-- Auto-Detection Department Badge -->
               <div id="rollAutoBadge" class="hidden mt-1.5 p-2 rounded-xl bg-[#2F7FF5]/15 border border-[#2F7FF5]/30 flex items-center space-x-2 text-xs">
-                <span class="inline-flex items-center text-[#529BF8] ghost-float shrink-0">
-                  <svg class="w-4 h-4 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C8.13 2 5 5.13 5 9v11c0 .55.45 1 1 1 .28 0 .53-.11.71-.29L8 19.41l1.29 1.3c.18.18.43.29.71.29s.53-.11.71-.29L12 19.41l1.29 1.3c.18.18.43.29.71.29s.53-.11.71-.29L16 19.41l1.29 1.3c.18.18.43.29.71.29.55 0 1-.45 1-1V9c0-3.87-3.13-7-7-7zm-3 9c-.83 0-1.5-.67-1.5-1.5S8.17 8 9 8s1.5.67 1.5 1.5S9.83 11 9 11zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 8 15 8s1.5.67 1.5 1.5S15.83 11 15 11z"/>
+                <span class="inline-flex items-center text-[#529BF8] shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
                   </svg>
                 </span>
                 <div class="truncate text-[11px] leading-tight">
@@ -822,11 +784,11 @@
       </section>
 
       <!-- ============================================== -->
-      <!-- SCREEN 3: WAITING FOR APPROVAL SCREEN (PATIENT GHOST MASCOT) -->
+      <!-- SCREEN 3: WAITING FOR APPROVAL SCREEN -->
       <!-- ============================================== -->
       <section id="screenApproval" class="hidden flex-1 flex-col items-center justify-start px-6 pt-3 pb-6 screen-fade overflow-y-auto no-scrollbar relative">
         <!-- Ambient Sapphire/Indigo Photonic Halo -->
-        <div class="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-[#2F7FF5]/25 via-[#1D6FE5]/10 to-transparent blur-3xl -z-10 ghost-aura"></div>
+        <div class="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-[#2F7FF5]/25 via-[#1D6FE5]/10 to-transparent blur-3xl -z-10 ambient-glow"></div>
 
         <!-- Dynamic Status Island Pill -->
         <div class="mb-3.5 mt-0.5 flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-[#0C101A]/85 border border-white/10 backdrop-blur-2xl shadow-xl shadow-black/80">
@@ -842,65 +804,14 @@
           <!-- Top Specular Refraction Bar -->
           <div class="pointer-events-none absolute inset-x-8 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
 
-          <!-- Dual-Beacon Icon & Mascot Centerpiece -->
-          <div class="relative w-36 h-32 flex items-center justify-center my-1 ghost-float">
-            <!-- Pulsing Aura Behind Mascot -->
-            <div class="absolute w-24 h-24 rounded-full bg-[#2F7FF5]/20 blur-xl animate-pulse"></div>
+          <!-- Verification Status Centerpiece -->
+          <div class="relative w-20 h-20 my-2 flex items-center justify-center">
+            <!-- Pulsing Ambient Amber Glow -->
+            <div class="absolute w-20 h-20 rounded-full bg-amber-500/20 blur-xl animate-pulse"></div>
 
-            <!-- Cute Patient Glass Ghost Mascot (Vector Frosted Glass Aesthetic) -->
-            <svg class="w-28 h-28 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)] z-10 transition-transform duration-700 hover:scale-105" fill="none" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient gradientUnits="userSpaceOnUse" id="ghostBodyGrad" x1="20" x2="100" y1="10" y2="110">
-                  <stop offset="0%" stop-color="#EAF2FF" stop-opacity="0.95"></stop>
-                  <stop offset="45%" stop-color="#8EBFFF" stop-opacity="0.75"></stop>
-                  <stop offset="100%" stop-color="#1E4482" stop-opacity="0.65"></stop>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="sheenEdge" x1="30" x2="90" y1="15" y2="15">
-                  <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"></stop>
-                  <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.1"></stop>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="mugGrad" x1="0" x2="20" y1="0" y2="20">
-                  <stop offset="0%" stop-color="#FDE68A"></stop>
-                  <stop offset="100%" stop-color="#D97706"></stop>
-                </linearGradient>
-              </defs>
-              <!-- Translucent Floaty Ghost Form -->
-              <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-              <!-- Specular Highlight Crest -->
-              <path d="M38 34C44 26 53 22 62 22C71 22 79 25 84 31" stroke="url(#sheenEdge)" stroke-linecap="round" stroke-width="2.5"></path>
-              <!-- Friendly Expectant Eyes -->
-              <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-              <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-              <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-              <!-- Subtle Soft Cheek Blush -->
-              <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-              <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
-              <!-- Tiny Patient Content Smile -->
-              <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-              <!-- Cute Tiny Amber Tea Mug with Warm Steam -->
-              <g transform="translate(51, 64)">
-                <!-- Steam Wisp -->
-                <path d="M6 -2C5 -5 10 -7 9 -10" stroke="#FDE68A" stroke-dasharray="2 3" stroke-linecap="round" stroke-width="1.4">
-                  <animate attributeName="stroke-dashoffset" dur="2s" repeatCount="indefinite" values="5;0"></animate>
-                </path>
-                <path d="M11 -1C12 -4 8 -6 10 -9" stroke="#FDE68A" stroke-dasharray="2 3" stroke-linecap="round" stroke-width="1.2">
-                  <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" values="5;0"></animate>
-                </path>
-                <!-- Mug Base -->
-                <rect fill="url(#mugGrad)" height="15" rx="3.5" width="14" x="2" y="2"></rect>
-                <path d="M16 6H18.5C19.8 6 20.8 7 20.8 8.3C20.8 9.6 19.8 10.6 18.5 10.6H16" stroke="#D97706" stroke-linecap="round" stroke-width="1.6"></path>
-                <!-- Heart Stamp on Mug -->
-                <path d="M9 7.5C8 6.5 6.5 7.2 6.5 8.2C6.5 9.4 9 10.8 9 10.8C9 10.8 11.5 9.4 11.5 8.2C11.5 7.2 10 6.5 9 7.5Z" fill="#78350F"></path>
-              </g>
-              <!-- Little Resting Mascot Paws Holding Mug -->
-              <ellipse cx="49" cy="72" fill="#C5DCFF" rx="4" ry="3.5"></ellipse>
-              <ellipse cx="71" cy="72" fill="#C5DCFF" rx="4" ry="3.5"></ellipse>
-            </svg>
-
-            <!-- Glass Amber Hourglass Float Tag -->
-            <div class="absolute -bottom-1 -right-1 w-9 h-9 rounded-xl bg-[#0C101A]/90 border border-white/10 backdrop-blur-xl flex items-center justify-center text-amber-400 shadow-lg shadow-black/60 z-20">
-              <svg class="w-4 h-4 animate-spin" style="animation-duration: 9s;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <!-- Sleek Glass Review Shield -->
+            <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-b from-amber-500/15 to-amber-500/5 border border-amber-400/30 flex items-center justify-center shadow-lg backdrop-blur-md">
+              <svg class="w-10 h-10 text-amber-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -1019,26 +930,10 @@
               </div>
             </div>
 
-            <!-- Interactive Cute Mascot Companion -->
-            <div id="attendanceGhostCompanion" class="relative w-12 h-12 flex items-center justify-center ghost-float transition-all duration-500 hover:scale-110 cursor-pointer" onclick="pokeCompanionGhost()" title="Tap your mascot companion!">
-              <div class="absolute w-9 h-9 rounded-full bg-[#2F7FF5]/20 blur-md"></div>
-              <svg class="w-11 h-11 drop-shadow-md z-10" fill="none" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient gradientUnits="userSpaceOnUse" id="ghostMiniGrad" x1="20" x2="100" y1="10" y2="110">
-                    <stop offset="0%" stop-color="#EAF2FF" stop-opacity="0.95"></stop>
-                    <stop offset="45%" stop-color="#8EBFFF" stop-opacity="0.75"></stop>
-                    <stop offset="100%" stop-color="#1E4482" stop-opacity="0.65"></stop>
-                  </linearGradient>
-                </defs>
-                <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostMiniGrad)"></path>
-                <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-                <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
-                <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-                <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-                <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-                <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.5" r="3.2"></circle>
-                <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
-              </svg>
+            <!-- Verified Attendance Status Indicator -->
+            <div id="attendanceGhostCompanion" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 text-[#529BF8]">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#529BF8] animate-pulse"></span>
+              <span class="text-xs font-bold tracking-wide">Club Active</span>
             </div>
           </div>
 
@@ -1129,7 +1024,7 @@
           <!-- STATE C: APPROVED / PRESENT -->
           <div id="markedState" class="hidden w-full flex flex-col items-center screen-fade relative">
             <!-- Ambient Aura behind marked state -->
-            <div class="pointer-events-none absolute w-72 h-72 rounded-full bg-gradient-to-b from-[#2F7FF5]/25 to-transparent blur-2xl -z-10 ghost-aura"></div>
+            <div class="pointer-events-none absolute w-72 h-72 rounded-full bg-gradient-to-b from-[#2F7FF5]/25 to-transparent blur-2xl -z-10 ambient-glow"></div>
 
             <div class="relative overflow-hidden w-60 h-60 rounded-full bg-gradient-to-b from-[#0A2616] via-[#0E2040] to-[#0A162B] border border-emerald-400/80 flex flex-col items-center justify-center p-6 shadow-[0_0_55px_rgba(16,185,129,0.5)] sheen-active">
               <!-- Specular Glass Highlight Arc -->
@@ -1692,39 +1587,26 @@
 
 
 
-    <!-- BEAUTIFUL GHOST GLOBAL LOADING ANIMATION -->
-    <div id="ghostGlobalLoader" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-xl transition-opacity duration-300">
+    <!-- PREMIUM YOC LOGO GLOBAL LOADING OVERLAY -->
+    <div id="ghostGlobalLoader" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-xl transition-opacity duration-300">
       <div class="relative flex flex-col items-center text-center px-6">
-        <!-- Ambient Sapphire/Indigo Photonic Aura -->
+        <!-- Ambient Sapphire Glow -->
         <div class="absolute w-56 h-56 rounded-full bg-[#2F7FF5]/25 blur-3xl -z-10 animate-pulse"></div>
         
-        <!-- Floating Frosted Glass Ghost Mascot -->
-        <div class="w-28 h-28 relative mb-3 ghost-float">
-          <svg class="w-28 h-28 drop-shadow-[0_16px_32px_rgba(0,0,0,0.8)]" fill="none" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="globalGhostGrad" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.98"></stop>
-                <stop offset="45%" stop-color="#8EBFFF" stop-opacity="0.80"></stop>
-                <stop offset="100%" stop-color="#1E4482" stop-opacity="0.65"></stop>
-              </linearGradient>
-              <linearGradient id="globalGhostSheen" x1="30" x2="90" y1="15" y2="15" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"></stop>
-                <stop offset="100%" stop-color="#BAE6FD" stop-opacity="0.2"></stop>
-              </linearGradient>
-            </defs>
-            <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#globalGhostGrad)"></path>
-            <path d="M38 34C44 26 53 22 62 22C71 22 79 25 84 31" stroke="url(#globalGhostSheen)" stroke-linecap="round" stroke-width="2.5"></path>
-            <ellipse cx="50" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-            <ellipse cx="70" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
-            <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
-            <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.55" r="3.2"></circle>
-            <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.55" r="3.2"></circle>
-            <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
+        <!-- YOC Logo with Spinner Ring -->
+        <div class="relative w-24 h-24 mb-4 flex items-center justify-center">
+          <!-- Outer Spinning Accent Ring -->
+          <svg class="animate-spin absolute inset-0 w-full h-full text-[#2F7FF5]" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="46" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="70 180" class="opacity-90"></circle>
           </svg>
+          
+          <!-- Inner Frosted Glass YOC Logo Container -->
+          <div class="w-16 h-16 rounded-2xl p-2 bg-gradient-to-b from-white/[0.12] to-white/[0.04] border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.6)] flex items-center justify-center backdrop-blur-md">
+            <img src="icons/yoc-logo.png" alt="YOC Logo" class="w-full h-full object-contain drop-shadow">
+          </div>
         </div>
 
-        <!-- Shimmering Pill Label -->
+        <!-- Shimmering Status Pill -->
         <div class="flex items-center space-x-2 px-4 py-1.5 rounded-full bg-[#0C101A]/90 border border-white/10 shadow-xl">
           <span class="w-2 h-2 rounded-full bg-[#529BF8] animate-ping"></span>
           <span id="ghostLoaderText" class="text-xs font-bold text-white tracking-wide">Loading...</span>
@@ -1839,6 +1721,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
