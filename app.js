@@ -2944,14 +2944,20 @@ async function coordinatorApproveStudent(attendanceId) {
   }
 
   try {
-    const { error } = await STATE.supabase
+    let { error } = await STATE.supabase
       .from('attendance')
       .update({ status: 'PRESENT' })
       .eq('id', attendanceId);
 
+    // Fallback to RPC if direct update has RLS restriction
     if (error) {
-      showToast(error.message || "Approval failed");
-      return;
+      const rpcRes = await STATE.supabase.rpc('coordinator_approve_attendance', {
+        p_attendance_id: attendanceId
+      });
+      if (rpcRes.error) {
+        showToast(rpcRes.error.message || error.message || "Approval failed");
+        return;
+      }
     }
 
     playChime(true);
@@ -3001,15 +3007,21 @@ async function coordinatorApproveAllToday() {
 
   const todayStr = getTodayDateString();
   try {
-    const { error } = await STATE.supabase
+    let { error } = await STATE.supabase
       .from('attendance')
       .update({ status: 'PRESENT' })
       .eq('attendance_date', todayStr)
       .eq('status', 'OPTED_IN');
 
+    // Fallback to RPC if direct update has RLS restriction
     if (error) {
-      showToast(error.message || "Failed to approve all");
-      return;
+      const rpcRes = await STATE.supabase.rpc('coordinator_approve_all_today', {
+        p_date: todayStr
+      });
+      if (rpcRes.error) {
+        showToast(rpcRes.error.message || error.message || "Failed to approve all");
+        return;
+      }
     }
 
     playChime(true);
