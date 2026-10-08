@@ -14,13 +14,23 @@ const STATE = {
   supabase: null,
   isConfigured: false,
   isAuthenticated: false,
-  currentUser: null, // { id, name, identifier, role, approval_status, email }
+  currentUser: null, // { id, name, identifier, role, approval_status, email, can_approve_attendance }
   currentScreen: 'login',
   todayMarked: false,
+  todayOptedIn: false,
+  todayApproved: false,
+  todayStatus: null, // 'OPTED_IN', 'PRESENT', 'REJECTED'
   todayAttendanceId: null,
   todayMarkedTime: '',
   activeHistoryFilter: 'all',
   historyRecords: [],
+  // Coordinator State
+  coordinatorOptedInQueue: [],
+  optInPollTimer: null,
+  // Leaderboard State
+  leaderboardUsers: [],
+  leaderboardAttendance: [],
+  leaderboardFilterText: '',
   // Admin State
   adminUsers: [],
   adminPendingUsers: [],
@@ -539,8 +549,24 @@ function showScreen(screenId) {
     }
   }
 
+  // For coordinator, daily attendance check-in is not needed (bypass to coordinator portal)
+  if (STATE.currentUser && STATE.currentUser.role === 'coordinator') {
+    if (screenId === 'attendance' || screenId === 'history') {
+      screenId = 'coordinator';
+    }
+  }
+
   STATE.currentScreen = screenId;
-  const screenIds = ['screenLogin', 'screenSignup', 'screenApproval', 'screenAttendance', 'screenHistory', 'screenAdmin'];
+  const screenIds = [
+    'screenLogin', 
+    'screenSignup', 
+    'screenApproval', 
+    'screenAttendance', 
+    'screenHistory', 
+    'screenLeaderboard', 
+    'screenCoordinator', 
+    'screenAdmin'
+  ];
   
   screenIds.forEach(id => {
     const el = document.getElementById(id);
@@ -553,6 +579,9 @@ function showScreen(screenId) {
     'approval': 'screenApproval',
     'attendance': 'screenAttendance',
     'history': 'screenHistory',
+    'leaderboard': 'screenLeaderboard',
+    'coordinator': 'screenCoordinator',
+    'coordOptIns': 'screenCoordinator',
     'admin': 'screenAdmin'
   };
 
@@ -606,23 +635,31 @@ function showScreen(screenId) {
 function updateNavIcons(activeTab) {
   const attendanceBtn = document.getElementById('tabAttendanceBtn');
   const historyBtn = document.getElementById('tabHistoryBtn');
+  const leaderboardBtn = document.getElementById('tabLeaderboardBtn');
+  const coordApprovalsBtn = document.getElementById('tabCoordinatorApprovalsBtn');
+  const coordMembersBtn = document.getElementById('tabCoordinatorMembersBtn');
   const approvalsBtn = document.getElementById('tabAdminApprovalsBtn');
   const rankingsBtn = document.getElementById('tabAdminRankingsBtn');
   const consoleBtn = document.getElementById('tabAdminConsoleBtn');
 
-  const isAdmin = STATE.currentUser && STATE.currentUser.role === 'admin';
+  const role = STATE.currentUser ? STATE.currentUser.role : 'student';
 
-  if (isAdmin) {
-    // Hide member check-in tabs for admin (admin attendance is not needed)
+  const defaultBtnClass = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+  const activeBtnClass = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
+
+  if (role === 'admin') {
+    // Hide student and coordinator tabs
     if (attendanceBtn) attendanceBtn.classList.add('hidden');
     if (historyBtn) historyBtn.classList.add('hidden');
+    if (coordApprovalsBtn) coordApprovalsBtn.classList.add('hidden');
+    if (coordMembersBtn) coordMembersBtn.classList.add('hidden');
 
-    // Show admin dedicated navigation tabs
+    // Show admin tabs + universal leaderboard
     if (approvalsBtn) approvalsBtn.classList.remove('hidden');
-    if (rankingsBtn) rankingsBtn.classList.remove('hidden');
+    if (leaderboardBtn) leaderboardBtn.classList.remove('hidden');
     if (consoleBtn) consoleBtn.classList.remove('hidden');
 
-    // Update pending badge on approvals tab
+    // Update pending counter badge
     const pendingCount = STATE.adminPendingUsers ? STATE.adminPendingUsers.length : 0;
     const navBadge = document.getElementById('navPendingBadge');
     if (navBadge) {
@@ -630,35 +667,72 @@ function updateNavIcons(activeTab) {
       navBadge.classList.toggle('hidden', pendingCount === 0);
     }
 
-    const currentTab = STATE.adminActiveTab || 'pending';
-    [approvalsBtn, rankingsBtn, consoleBtn].forEach(b => {
-      if (b) b.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+    [approvalsBtn, leaderboardBtn, consoleBtn].forEach(b => {
+      if (b) b.className = defaultBtnClass;
     });
 
-    if (currentTab === 'pending' && approvalsBtn) {
-      approvalsBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
-    } else if (currentTab === 'rank' && rankingsBtn) {
-      rankingsBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
-    } else if (consoleBtn) {
-      consoleBtn.className = "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition";
+    if (activeTab === 'leaderboard' && leaderboardBtn) {
+      leaderboardBtn.className = activeBtnClass;
+    } else if (activeTab === 'admin' || activeTab === 'pending') {
+      const currentTab = STATE.adminActiveTab || 'pending';
+      if (currentTab === 'all' && consoleBtn) {
+        consoleBtn.className = activeBtnClass;
+      } else if (approvalsBtn) {
+        approvalsBtn.className = activeBtnClass;
+      }
     }
-  } else {
-    // Regular member navigation
-    if (attendanceBtn) attendanceBtn.classList.remove('hidden');
-    if (historyBtn) historyBtn.classList.remove('hidden');
+  } else if (role === 'coordinator') {
+    // Hide student check-in & admin only tabs
+    if (attendanceBtn) attendanceBtn.classList.add('hidden');
+    if (historyBtn) historyBtn.classList.add('hidden');
     if (approvalsBtn) approvalsBtn.classList.add('hidden');
-    if (rankingsBtn) rankingsBtn.classList.add('hidden');
     if (consoleBtn) consoleBtn.classList.add('hidden');
 
-    if (attendanceBtn) {
-      attendanceBtn.className = activeTab === 'attendance'
-        ? "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition"
-        : "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+    // Show coordinator dedicated navigation
+    if (coordApprovalsBtn) coordApprovalsBtn.classList.remove('hidden');
+    if (leaderboardBtn) leaderboardBtn.classList.remove('hidden');
+    if (coordMembersBtn) coordMembersBtn.classList.remove('hidden');
+
+    // Update coordinator opt-in badge
+    const coordQueueCount = STATE.coordinatorOptedInQueue ? STATE.coordinatorOptedInQueue.length : 0;
+    const coordBadge = document.getElementById('navCoordOptInBadge');
+    if (coordBadge) {
+      coordBadge.textContent = coordQueueCount;
+      coordBadge.classList.toggle('hidden', coordQueueCount === 0);
     }
-    if (historyBtn) {
-      historyBtn.className = activeTab === 'history'
-        ? "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-[#2F7FF5] transition"
-        : "tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition";
+
+    [coordApprovalsBtn, leaderboardBtn, coordMembersBtn].forEach(b => {
+      if (b) b.className = defaultBtnClass;
+    });
+
+    if (activeTab === 'leaderboard' && leaderboardBtn) {
+      leaderboardBtn.className = activeBtnClass;
+    } else if (activeTab === 'coordMembers' && coordMembersBtn) {
+      coordMembersBtn.className = activeBtnClass;
+    } else if (coordApprovalsBtn) {
+      coordApprovalsBtn.className = activeBtnClass;
+    }
+  } else {
+    // Regular student / member navigation
+    if (coordApprovalsBtn) coordApprovalsBtn.classList.add('hidden');
+    if (coordMembersBtn) coordMembersBtn.classList.add('hidden');
+    if (approvalsBtn) approvalsBtn.classList.add('hidden');
+    if (consoleBtn) consoleBtn.classList.add('hidden');
+
+    if (attendanceBtn) attendanceBtn.classList.remove('hidden');
+    if (historyBtn) historyBtn.classList.remove('hidden');
+    if (leaderboardBtn) leaderboardBtn.classList.remove('hidden');
+
+    [attendanceBtn, historyBtn, leaderboardBtn].forEach(b => {
+      if (b) b.className = defaultBtnClass;
+    });
+
+    if (activeTab === 'attendance' && attendanceBtn) {
+      attendanceBtn.className = activeBtnClass;
+    } else if (activeTab === 'history' && historyBtn) {
+      historyBtn.className = activeBtnClass;
+    } else if (activeTab === 'leaderboard' && leaderboardBtn) {
+      leaderboardBtn.className = activeBtnClass;
     }
   }
 }
@@ -669,14 +743,29 @@ function switchNavTab(tab) {
       switchAdminTab('pending');
       return;
     }
+    if (STATE.currentUser && STATE.currentUser.role === 'coordinator') {
+      showScreen('coordinator');
+      loadCoordinatorData();
+      return;
+    }
     showScreen('attendance');
   } else if (tab === 'history') {
     if (STATE.currentUser && STATE.currentUser.role === 'admin') {
-      switchAdminTab('rank');
+      showScreen('leaderboard');
+      loadGlobalLeaderboard();
       return;
     }
     renderHistory();
     showScreen('history');
+  } else if (tab === 'leaderboard') {
+    showScreen('leaderboard');
+    loadGlobalLeaderboard();
+  } else if (tab === 'coordOptIns') {
+    showScreen('coordinator');
+    loadCoordinatorData();
+  } else if (tab === 'coordMembers') {
+    showScreen('admin');
+    setAdminTab('all');
   } else if (tab === 'admin') {
     if (STATE.currentUser && STATE.currentUser.role === 'admin') {
       loadAdminData();
@@ -776,6 +865,15 @@ async function loadUserProfile(userId) {
 
     // Role and approval status routing
     if (profile.approval_status === 'pending') {
+      const waitTitle = document.querySelector('#screenApproval h2');
+      const waitDesc = document.querySelector('#screenApproval h2 + p');
+      if (profile.role === 'coordinator') {
+        if (waitTitle) waitTitle.textContent = "Coordinator Verification Pending";
+        if (waitDesc) waitDesc.textContent = "Your coordinator registration requires Club Admin approval before you can verify and take attendance.";
+      } else {
+        if (waitTitle) waitTitle.textContent = "Waiting for approval";
+        if (waitDesc) waitDesc.textContent = "Your member account has been registered. A club admin will approve your profile shortly.";
+      }
       showScreen('approval');
       return;
     }
@@ -788,10 +886,17 @@ async function loadUserProfile(userId) {
       return;
     }
 
-    // Admin routing (no attendance check-in needed for admin)
+    // Admin routing
     if (profile.role === 'admin') {
       showScreen('admin');
       await loadAdminData();
+      return;
+    }
+
+    // Coordinator routing!
+    if (profile.role === 'coordinator') {
+      showScreen('coordinator');
+      await loadCoordinatorData();
       return;
     }
 
@@ -955,6 +1060,33 @@ function checkPasswordMatch() {
   }
 }
 
+function setSignupRole(role) {
+  const roleInput = document.getElementById('signupRole');
+  const btnMember = document.getElementById('roleBtnMember');
+  const btnCoord = document.getElementById('roleBtnCoordinator');
+  const notice = document.getElementById('coordinatorRoleNotice');
+
+  if (roleInput) roleInput.value = role;
+
+  if (role === 'coordinator') {
+    if (btnMember) {
+      btnMember.className = "tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-white/60 hover:text-white";
+    }
+    if (btnCoord) {
+      btnCoord.className = "tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md";
+    }
+    if (notice) notice.classList.remove('hidden');
+  } else {
+    if (btnMember) {
+      btnMember.className = "tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 bg-[#2F7FF5] text-white shadow-md";
+    }
+    if (btnCoord) {
+      btnCoord.className = "tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-white/60 hover:text-white";
+    }
+    if (notice) notice.classList.add('hidden');
+  }
+}
+
 async function handleSignup() {
   if (!STATE.isConfigured && !initSupabase()) {
     showToast("Connecting to service, please try again...");
@@ -965,6 +1097,7 @@ async function handleSignup() {
   const rollNo = (document.getElementById('signupRoll')?.value || '').trim().toUpperCase();
   const department = (document.getElementById('signupDept')?.value || '').trim();
   const batchYear = (document.getElementById('signupYear')?.value || '').trim();
+  const signupRole = (document.getElementById('signupRole')?.value || 'student').trim();
   const identityInput = document.getElementById('signupIdentity').value.trim();
   const password = document.getElementById('signupPassword').value;
   const confirmPassword = document.getElementById('signupConfirm').value;
@@ -1037,7 +1170,8 @@ async function handleSignup() {
           identifier: normalized.displayIdentifier,
           roll_no: rollNo,
           department: department,
-          batch_year: batchYear
+          batch_year: batchYear,
+          role: signupRole
         }
       }
     });
@@ -1181,15 +1315,39 @@ async function loadTodayAttendance() {
     }
 
     if (data) {
-      STATE.todayMarked = true;
       STATE.todayAttendanceId = data.id;
+      STATE.todayStatus = data.status || 'OPTED_IN';
       STATE.todayMarkedTime = formatTimeString(data.created_at);
-      const stampElem = document.getElementById('markedTimestamp');
-      if (stampElem) stampElem.textContent = `Logged today at ${STATE.todayMarkedTime}`;
+
+      if (data.status === 'PRESENT') {
+        STATE.todayApproved = true;
+        STATE.todayOptedIn = false;
+        STATE.todayMarked = true;
+        const stampElem = document.getElementById('markedTimestamp');
+        if (stampElem) stampElem.textContent = `Approved today at ${STATE.todayMarkedTime}`;
+        stopOptInStatusWatcher();
+      } else if (data.status === 'OPTED_IN') {
+        STATE.todayApproved = false;
+        STATE.todayOptedIn = true;
+        STATE.todayMarked = false;
+        const optStamp = document.getElementById('optedInTimestamp');
+        if (optStamp) optStamp.textContent = `Opted in today at ${STATE.todayMarkedTime}`;
+        startOptInStatusWatcher();
+      } else {
+        // REJECTED or reset
+        STATE.todayApproved = false;
+        STATE.todayOptedIn = false;
+        STATE.todayMarked = false;
+        stopOptInStatusWatcher();
+      }
     } else {
-      STATE.todayMarked = false;
       STATE.todayAttendanceId = null;
+      STATE.todayStatus = null;
+      STATE.todayApproved = false;
+      STATE.todayOptedIn = false;
+      STATE.todayMarked = false;
       STATE.todayMarkedTime = '';
+      stopOptInStatusWatcher();
     }
 
     syncAttendanceButtonState();
@@ -1198,7 +1356,7 @@ async function loadTodayAttendance() {
   }
 }
 
-async function markTodayAttendance() {
+async function handleOptInAttendance() {
   if (!STATE.currentUser || !STATE.supabase) return;
 
   if (STATE.currentUser.approval_status !== 'approved') {
@@ -1207,8 +1365,8 @@ async function markTodayAttendance() {
   }
 
   const todayStr = getTodayDateString();
-  const markBtn = document.getElementById('markAttendanceBtn');
-  if (markBtn) markBtn.disabled = true;
+  const optInBtn = document.getElementById('optInAttendanceBtn');
+  if (optInBtn) optInBtn.disabled = true;
 
   try {
     const { data, error } = await STATE.supabase
@@ -1216,38 +1374,118 @@ async function markTodayAttendance() {
       .insert({
         user_id: STATE.currentUser.id,
         attendance_date: todayStr,
-        status: 'PRESENT'
+        status: 'OPTED_IN'
       })
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505' || error.message.includes('unique')) {
-        showToast("Attendance already marked for today");
+        showToast("Opt-in already registered for today");
+        await loadTodayAttendance();
       } else {
-        showToast(error.message || "Failed to record attendance");
+        showToast(error.message || "Failed to opt in");
       }
       return;
     }
 
     playChime(true);
-    triggerConfetti();
-
-    STATE.todayMarked = true;
     STATE.todayAttendanceId = data.id;
+    STATE.todayStatus = 'OPTED_IN';
+    STATE.todayOptedIn = true;
+    STATE.todayApproved = false;
+    STATE.todayMarked = false;
     STATE.todayMarkedTime = formatTimeString(data.created_at);
-    
-    const stampElem = document.getElementById('markedTimestamp');
-    if (stampElem) stampElem.textContent = `Logged today at ${STATE.todayMarkedTime}`;
+
+    const optStamp = document.getElementById('optedInTimestamp');
+    if (optStamp) optStamp.textContent = `Opted in today at ${STATE.todayMarkedTime}`;
 
     syncAttendanceButtonState();
-    await loadAttendanceHistory();
-    showToast("✓ Attendance recorded");
+    startOptInStatusWatcher();
+    showToast("⏳ Opted in! Waiting for Coordinator approval");
   } catch (err) {
-    console.error('Mark attendance failed:', err);
-    showToast("Failed to mark attendance");
+    console.error('Opt-in failed:', err);
+    showToast("Failed to opt in for attendance");
   } finally {
-    if (markBtn) markBtn.disabled = false;
+    if (optInBtn) optInBtn.disabled = false;
+  }
+}
+
+// Backward-compatibility alias
+function markTodayAttendance() {
+  return handleOptInAttendance();
+}
+
+async function cancelTodayOptIn() {
+  if (!STATE.currentUser || !STATE.supabase || !STATE.todayAttendanceId) return;
+
+  try {
+    const { error } = await STATE.supabase
+      .from('attendance')
+      .delete()
+      .eq('id', STATE.todayAttendanceId)
+      .eq('user_id', STATE.currentUser.id);
+
+    if (error) {
+      showToast(error.message || "Could not cancel opt-in");
+      return;
+    }
+
+    stopOptInStatusWatcher();
+    STATE.todayAttendanceId = null;
+    STATE.todayStatus = null;
+    STATE.todayOptedIn = false;
+    STATE.todayApproved = false;
+    STATE.todayMarked = false;
+
+    syncAttendanceButtonState();
+    showToast("Opt-in cancelled");
+  } catch (err) {
+    console.error('Error cancelling opt-in:', err);
+    showToast("Failed to cancel opt-in");
+  }
+}
+
+function startOptInStatusWatcher() {
+  stopOptInStatusWatcher();
+  STATE.optInPollTimer = setInterval(async () => {
+    if (!STATE.todayAttendanceId || !STATE.supabase || !STATE.currentUser) return;
+    try {
+      const { data, error } = await STATE.supabase
+        .from('attendance')
+        .select('id, status, created_at')
+        .eq('id', STATE.todayAttendanceId)
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      if (data.status === 'PRESENT') {
+        stopOptInStatusWatcher();
+        STATE.todayApproved = true;
+        STATE.todayOptedIn = false;
+        STATE.todayMarked = true;
+        STATE.todayStatus = 'PRESENT';
+        
+        playChime(true);
+        triggerConfetti();
+
+        const stampElem = document.getElementById('markedTimestamp');
+        if (stampElem) stampElem.textContent = `Approved today at ${formatTimeString(data.created_at)}`;
+
+        syncAttendanceButtonState();
+        await loadAttendanceHistory();
+        showToast("🎉 Attendance Approved by Coordinator!");
+      }
+    } catch (e) {
+      // Background poll
+    }
+  }, 4000);
+}
+
+function stopOptInStatusWatcher() {
+  if (STATE.optInPollTimer) {
+    clearInterval(STATE.optInPollTimer);
+    STATE.optInPollTimer = null;
   }
 }
 
@@ -1280,7 +1518,11 @@ async function confirmDeleteTodayAttendance() {
     }
 
     playChime(false);
+    stopOptInStatusWatcher();
     STATE.todayMarked = false;
+    STATE.todayOptedIn = false;
+    STATE.todayApproved = false;
+    STATE.todayStatus = null;
     STATE.todayAttendanceId = null;
     STATE.todayMarkedTime = '';
 
@@ -1295,18 +1537,27 @@ async function confirmDeleteTodayAttendance() {
 
 function syncAttendanceButtonState() {
   const unmarkedView = document.getElementById('unmarkedState');
+  const optedInView = document.getElementById('optedInState');
   const markedView = document.getElementById('markedState');
   const companion = document.getElementById('attendanceGhostCompanion');
 
-  if (STATE.todayMarked) {
-    if (unmarkedView) unmarkedView.classList.add('hidden');
+  if (unmarkedView) unmarkedView.classList.add('hidden');
+  if (optedInView) optedInView.classList.add('hidden');
+  if (markedView) markedView.classList.add('hidden');
+
+  if (STATE.todayApproved) {
     if (markedView) markedView.classList.remove('hidden');
     if (companion) {
       companion.classList.remove('ghost-float');
       companion.classList.add('ghost-celebrate');
     }
+  } else if (STATE.todayOptedIn) {
+    if (optedInView) optedInView.classList.remove('hidden');
+    if (companion) {
+      companion.classList.remove('ghost-celebrate');
+      companion.classList.add('ghost-float');
+    }
   } else {
-    if (markedView) markedView.classList.add('hidden');
     if (unmarkedView) unmarkedView.classList.remove('hidden');
     if (companion) {
       companion.classList.remove('ghost-celebrate');
@@ -1639,14 +1890,20 @@ function renderAdminUI() {
   // -------------------------------------------------------------
   if (STATE.adminActiveTab === 'pending') {
     const pendingList = STATE.adminPendingUsers || [];
+    const pendingCoords = pendingList.filter(u => u.role === 'coordinator');
+    const pendingStudents = pendingList.filter(u => u.role !== 'coordinator');
+    const approvedCoords = (STATE.adminUsers || []).filter(u => u.role === 'coordinator' && u.approval_status === 'approved');
+    const todayStr = getTodayDateString();
+    const optedInToday = (STATE.adminAttendance || []).filter(a => a.status === 'OPTED_IN' && a.attendance_date === todayStr);
 
-    if (pendingList.length === 0) {
+    const hasAnyWork = pendingList.length > 0 || approvedCoords.length > 0 || optedInToday.length > 0;
+
+    if (!hasAnyWork) {
       container.innerHTML = `
         <div class="py-12 flex flex-col items-center justify-center text-center px-4">
           <div class="w-24 h-24 relative mb-3 ghost-float">
             <svg class="w-24 h-24 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" viewBox="0 0 120 120" fill="none">
               <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
-              <path d="M38 34C44 26 53 22 62 22C71 22 79 25 84 31" stroke="url(#sheenEdge)" stroke-linecap="round" stroke-width="2.5"></path>
               <ellipse cx="50" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
               <ellipse cx="70" cy="50" fill="#040A18" rx="3.5" ry="4.5"></ellipse>
               <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
@@ -1657,69 +1914,211 @@ function renderAdminUI() {
             </svg>
           </div>
           <p class="text-base font-bold text-white">Queue Clear!</p>
-          <p class="text-xs text-white/50 mt-1 max-w-[260px]">All registered members are approved and ready for club attendance.</p>
+          <p class="text-xs text-white/50 mt-1 max-w-[260px]">All registered members and coordinators are approved and up to date.</p>
         </div>
       `;
       return;
     }
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'space-y-3';
+    wrapper.className = 'space-y-4';
 
-    // Top action bar
-    const queueHeader = document.createElement('div');
-    queueHeader.className = 'flex items-center justify-between px-1 py-0.5';
-    queueHeader.innerHTML = `
-      <span class="text-xs font-semibold text-white/70">
-        <span class="text-amber-300 font-bold">${pendingList.length}</span> Awaiting Review
-      </span>
-      ${pendingList.length > 1 ? `
-        <button onclick="adminApproveAllUsers()" class="tap-scale px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 transition shadow-sm">
-          ✓ Approve All (${pendingList.length})
-        </button>
-      ` : ''}
-    `;
-    wrapper.appendChild(queueHeader);
-
-    // Cards list
-    pendingList.forEach(user => {
-      const card = document.createElement('div');
-      card.className = 'zentra-card-elevated p-4 rounded-2xl border border-amber-400/25 shadow-lg space-y-3 relative overflow-hidden';
-      card.innerHTML = `
-        <div class="flex items-start justify-between">
-          <div class="flex items-start space-x-3 truncate">
-            <div class="w-10 h-10 rounded-2xl bg-amber-400/15 text-amber-300 border border-amber-400/30 flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5">
-              ${(user.name || 'M')[0].toUpperCase()}
-            </div>
-            <div class="truncate">
-              <div class="flex items-center space-x-1.5 flex-wrap">
-                <span class="text-sm font-bold text-white truncate">${user.name}</span>
-                ${user.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/25 text-blue-300 border border-blue-500/30">${user.roll_no}</span>` : ''}
-              </div>
-              <p class="text-[11px] text-white/60 truncate mt-0.5">
-                ${user.department ? `${user.department} • ` : ''}${user.batch_year ? `${user.batch_year} Batch` : ''}
-              </p>
-              <p class="text-[10px] text-white/40 truncate mt-0.5 font-mono">
-                ${user.identifier}
-              </p>
-            </div>
-          </div>
-          <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 flex-shrink-0">
-            Pending
+    // 1. SECTION: PENDING COORDINATORS
+    if (pendingCoords.length > 0) {
+      const coordSec = document.createElement('div');
+      coordSec.className = 'space-y-2';
+      coordSec.innerHTML = `
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-purple-300 flex items-center space-x-1.5">
+            <span>🎖️</span>
+            <span>Pending Coordinators (${pendingCoords.length})</span>
           </span>
+          <span class="text-[10px] text-white/40">Requires Admin Approval</span>
         </div>
+      `;
 
-        <div class="flex items-center justify-end space-x-2.5 pt-2 border-t border-white/[0.06]">
-          <button onclick="openAdminDeleteModal('${user.id}', '${encodeURIComponent(user.name)}')" class="tap-scale px-3.5 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/25 text-xs font-semibold hover:bg-red-500/20 transition">
-            ✕ Reject
+      pendingCoords.forEach(u => {
+        const card = document.createElement('div');
+        card.className = 'zentra-card-elevated p-3.5 rounded-2xl border border-purple-400/40 shadow-lg space-y-2.5';
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex items-start space-x-3 truncate">
+              <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+                🎖️
+              </div>
+              <div class="truncate">
+                <div class="flex items-center space-x-1.5 flex-wrap">
+                  <span class="text-sm font-bold text-white truncate">${u.name}</span>
+                  ${u.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">${u.roll_no}</span>` : ''}
+                </div>
+                <p class="text-[11px] text-white/60 truncate mt-0.5">
+                  ${u.department ? `${u.department} • ` : ''}${u.batch_year ? `${u.batch_year} Batch` : ''}
+                </p>
+                <p class="text-[10px] text-white/40 truncate mt-0.5 font-mono">${u.identifier}</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+              Coordinator Request
+            </span>
+          </div>
+
+          <div class="flex items-center justify-end space-x-2 pt-2 border-t border-white/[0.06]">
+            <button onclick="openAdminDeleteModal('${u.id}', '${encodeURIComponent(u.name)}')" class="tap-scale px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/25 text-xs font-semibold hover:bg-red-500/20 transition">
+              ✕ Reject
+            </button>
+            <button onclick="adminApproveCoordinator('${u.id}')" class="tap-scale px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold shadow-md hover:brightness-110 transition">
+              ✓ Approve Coordinator
+            </button>
+          </div>
+        `;
+        coordSec.appendChild(card);
+      });
+      wrapper.appendChild(coordSec);
+    }
+
+    // 2. SECTION: COORDINATOR PERMISSIONS MANAGER
+    if (approvedCoords.length > 0) {
+      const permSec = document.createElement('div');
+      permSec.className = 'space-y-2';
+      permSec.innerHTML = `
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-white/80 flex items-center space-x-1.5">
+            <span>🛡️</span>
+            <span>Coordinator Permissions (${approvedCoords.length})</span>
+          </span>
+          <span class="text-[10px] text-white/40">Attendance Access</span>
+        </div>
+      `;
+
+      approvedCoords.forEach(c => {
+        const canApprove = c.can_approve_attendance !== false;
+        const card = document.createElement('div');
+        card.className = 'zentra-card p-3 rounded-2xl border border-white/10 flex items-center justify-between space-x-2';
+        card.innerHTML = `
+          <div class="truncate">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-xs font-bold text-white truncate">${c.name}</span>
+              ${c.roll_no ? `<span class="text-[10px] font-mono text-blue-300 font-bold">${c.roll_no}</span>` : ''}
+            </div>
+            <p class="text-[10px] text-white/50 truncate">${c.department || 'Coordinator'}</p>
+          </div>
+          <button 
+            onclick="toggleCoordinatorPermission('${c.id}', ${!canApprove})"
+            class="tap-scale px-3 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center space-x-1.5 shrink-0 ${
+              canApprove 
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30' 
+                : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
+            }"
+            title="Toggle permission to take and approve attendance"
+          >
+            <span>${canApprove ? '🟢 Active' : '🔴 Paused'}</span>
           </button>
-          <button onclick="adminApproveUser('${user.id}')" class="tap-scale px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-md hover:brightness-110 transition">
-            ✓ Approve
+        `;
+        permSec.appendChild(card);
+      });
+      wrapper.appendChild(permSec);
+    }
+
+    // 3. SECTION: TODAY'S OPT-IN ATTENDANCE (Admin review)
+    if (optedInToday.length > 0) {
+      const optSec = document.createElement('div');
+      optSec.className = 'space-y-2';
+      optSec.innerHTML = `
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
+            <span>⏳</span>
+            <span>Today's Opt-Ins (${optedInToday.length})</span>
+          </span>
+          <button onclick="coordinatorApproveAllToday()" class="tap-scale px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+            ⚡ Approve All
           </button>
         </div>
       `;
-      wrapper.appendChild(card);
-    });
+
+      optedInToday.forEach(item => {
+        const u = (STATE.adminUsers || []).find(usr => usr.id === item.user_id) || { name: 'Member', roll_no: '' };
+        const card = document.createElement('div');
+        card.className = 'zentra-card p-3 rounded-2xl border border-amber-400/30 flex items-center justify-between space-x-2';
+        card.innerHTML = `
+          <div class="truncate">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-xs font-bold text-white truncate">${u.name}</span>
+              ${u.roll_no ? `<span class="text-[10px] font-mono text-blue-300 font-bold">${u.roll_no}</span>` : ''}
+            </div>
+            <p class="text-[10px] text-white/50 truncate">Opted in at ${formatTimeString(item.created_at)}</p>
+          </div>
+          <div class="flex items-center space-x-1.5 shrink-0">
+            <button onclick="coordinatorRejectStudent('${item.id}')" class="tap-scale px-2.5 py-1 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold">
+              ✕
+            </button>
+            <button onclick="coordinatorApproveStudent('${item.id}')" class="tap-scale px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+              ✓ Approve
+            </button>
+          </div>
+        `;
+        optSec.appendChild(card);
+      });
+      wrapper.appendChild(optSec);
+    }
+
+    // 4. SECTION: PENDING CLUB MEMBERS
+    if (pendingStudents.length > 0) {
+      const studentSec = document.createElement('div');
+      studentSec.className = 'space-y-2';
+      studentSec.innerHTML = `
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-white/80 flex items-center space-x-1.5">
+            <span>👤</span>
+            <span>Pending Members (${pendingStudents.length})</span>
+          </span>
+          ${pendingStudents.length > 1 ? `
+            <button onclick="adminApproveAllUsers()" class="tap-scale px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+              ✓ Approve All (${pendingStudents.length})
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      pendingStudents.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'zentra-card-elevated p-4 rounded-2xl border border-amber-400/25 shadow-lg space-y-3 relative overflow-hidden';
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex items-start space-x-3 truncate">
+              <div class="w-10 h-10 rounded-2xl bg-amber-400/15 text-amber-300 border border-amber-400/30 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+                ${(user.name || 'M')[0].toUpperCase()}
+              </div>
+              <div class="truncate">
+                <div class="flex items-center space-x-1.5 flex-wrap">
+                  <span class="text-sm font-bold text-white truncate">${user.name}</span>
+                  ${user.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/25 text-blue-300 border border-blue-500/30">${user.roll_no}</span>` : ''}
+                </div>
+                <p class="text-[11px] text-white/60 truncate mt-0.5">
+                  ${user.department ? `${user.department} • ` : ''}${user.batch_year ? `${user.batch_year} Batch` : ''}
+                </p>
+                <p class="text-[10px] text-white/40 truncate mt-0.5 font-mono">
+                  ${user.identifier}
+                </p>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 shrink-0">
+              Pending
+            </span>
+          </div>
+
+          <div class="flex items-center justify-end space-x-2.5 pt-2 border-t border-white/[0.06]">
+            <button onclick="openAdminDeleteModal('${user.id}', '${encodeURIComponent(user.name)}')" class="tap-scale px-3.5 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/25 text-xs font-semibold hover:bg-red-500/20 transition">
+              ✕ Reject
+            </button>
+            <button onclick="adminApproveUser('${user.id}')" class="tap-scale px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-md hover:brightness-110 transition">
+              ✓ Approve
+            </button>
+          </div>
+        `;
+        studentSec.appendChild(card);
+      });
+      wrapper.appendChild(studentSec);
+    }
 
     container.appendChild(wrapper);
     return;
@@ -2216,30 +2615,36 @@ function setupPwa() {
       });
   }
 
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const headerInstallBtn = document.getElementById('headerInstallBtn');
+
+  // If running standalone, hide header install button
+  if (isStandalone) {
+    if (headerInstallBtn) headerInstallBtn.classList.add('hidden');
+    dismissPwaBanner();
+  } else {
+    // In mobile browser or desktop browser, show header install button
+    if (headerInstallBtn) headerInstallBtn.classList.remove('hidden');
+  }
+
   // Handle Chrome / Android beforeinstallprompt
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     STATE.pwaInstallPrompt = e;
-    console.log('✓ Chrome beforeinstallprompt detected: PWA installable (running in browser mode)');
-    // Banner is kept hidden by default so users can use the app directly in their mobile browser without install
+    console.log('✓ Chrome beforeinstallprompt detected: PWA installable');
+    if (!isStandalone && headerInstallBtn) {
+      headerInstallBtn.classList.remove('hidden');
+    }
   });
 
   // Handle Chrome appinstalled event
   window.addEventListener('appinstalled', (evt) => {
-    console.log('✓ Manavar Illam PWA successfully installed in Chrome/OS');
+    console.log('✓ Manavar Illam PWA successfully installed');
     STATE.pwaInstallPrompt = null;
+    if (headerInstallBtn) headerInstallBtn.classList.add('hidden');
     dismissPwaBanner();
     showToast("✓ App installed to Home Screen");
   });
-
-  // Check if standalone (already installed or running inside PWA wrapper)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  if (isStandalone) {
-    dismissPwaBanner();
-  } else if (sessionStorage.getItem('PWA_BANNER_DISMISSED') === '1') {
-    const banner = document.getElementById('pwaBanner');
-    if (banner) banner.classList.add('hidden');
-  }
 }
 
 function handleInstallPwa() {
@@ -2249,21 +2654,32 @@ function handleInstallPwa() {
       if (choiceResult.outcome === 'accepted') {
         showToast("✓ Added to Home Screen");
         dismissPwaBanner();
+        const headerBtn = document.getElementById('headerInstallBtn');
+        if (headerBtn) headerBtn.classList.add('hidden');
       }
       STATE.pwaInstallPrompt = null;
     });
   } else {
-    // Chrome Desktop, Android, or iOS fallback
     const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
     const isChrome = /chrome|crios/.test(navigator.userAgent.toLowerCase()) && !/edge|edg/.test(navigator.userAgent.toLowerCase());
     if (isIos) {
-      alert("To install on iPhone:\n1. Tap the Share button (square with arrow ↑) at the bottom.\n2. Scroll down and tap 'Add to Home Screen'.");
+      openIosInstallModal();
     } else if (isChrome) {
       showToast("Tap Chrome ⋮ menu and select 'Install app' or 'Add to Home screen'");
     } else {
       showToast("Use your browser menu to 'Install app' or 'Add to Home screen'");
     }
   }
+}
+
+function openIosInstallModal() {
+  const modal = document.getElementById('iosInstallModal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeIosInstallModal() {
+  const modal = document.getElementById('iosInstallModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function dismissPwaBanner() {
@@ -2276,10 +2692,544 @@ function dismissPwaBanner() {
 }
 
 // ------------------------------------------------------------------------------
-// 11. INITIALIZATION ON PAGE LOAD
+// 10. COORDINATOR PORTAL: QUEUE REVIEW & ATTENDANCE APPROVALS
+// ------------------------------------------------------------------------------
+async function loadCoordinatorData() {
+  if (!STATE.currentUser || (STATE.currentUser.role !== 'coordinator' && STATE.currentUser.role !== 'admin') || !STATE.supabase) return;
+
+  // Refresh current user profile to verify up-to-date permissions
+  try {
+    const { data: myProfile } = await STATE.supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', STATE.currentUser.id)
+      .single();
+    if (myProfile) {
+      STATE.currentUser = myProfile;
+    }
+  } catch (e) {
+    console.warn("Could not refresh coordinator profile:", e);
+  }
+
+  const canApprove = STATE.currentUser.role === 'admin' || STATE.currentUser.can_approve_attendance !== false;
+  
+  // Update badge and warning in Coordinator portal
+  const badge = document.getElementById('coordPermissionBadge');
+  const warning = document.getElementById('coordPermissionWarning');
+  const approveAllBtn = document.getElementById('coordApproveAllBtn');
+
+  if (badge) {
+    if (canApprove) {
+      badge.textContent = '🟢 Active';
+      badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+    } else {
+      badge.textContent = '🔴 Rights Paused';
+      badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+    }
+  }
+
+  if (warning) {
+    warning.classList.toggle('hidden', canApprove);
+  }
+
+  if (approveAllBtn) {
+    approveAllBtn.disabled = !canApprove;
+    approveAllBtn.classList.toggle('opacity-50', !canApprove);
+    approveAllBtn.classList.toggle('cursor-not-allowed', !canApprove);
+  }
+
+  // Load today's opted-in queue
+  const todayStr = getTodayDateString();
+  try {
+    const { data, error } = await STATE.supabase
+      .from('attendance')
+      .select('*, profiles(name, identifier, roll_no, department, batch_year)')
+      .eq('attendance_date', todayStr)
+      .eq('status', 'OPTED_IN')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("Queue fetch error:", error);
+      return;
+    }
+
+    STATE.coordinatorOptedInQueue = data || [];
+    renderCoordinatorQueue();
+  } catch (err) {
+    console.error("loadCoordinatorData error:", err);
+  }
+}
+
+function renderCoordinatorQueue() {
+  const countEl = document.getElementById('coordOptedInCount');
+  if (countEl) countEl.textContent = STATE.coordinatorOptedInQueue.length;
+
+  const container = document.getElementById('coordOptedInList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const canApprove = STATE.currentUser && (STATE.currentUser.role === 'admin' || STATE.currentUser.can_approve_attendance !== false);
+
+  if (STATE.coordinatorOptedInQueue.length === 0) {
+    container.innerHTML = `
+      <div class="py-12 flex flex-col items-center justify-center text-center px-4">
+        <div class="w-20 h-20 relative mb-3 ghost-float">
+          <svg class="w-20 h-20 drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)]" viewBox="0 0 120 120" fill="none">
+            <path d="M60 20C41 20 28 35 28 54C28 72 25 89 33 93C39 96 44 89 50 91C56 93 57 97 63 97C69 97 71 92 77 92C83 92 86 96 92 92C97 88 92 70 92 54C92 35 79 20 60 20Z" fill="url(#ghostBodyGrad)"></path>
+            <ellipse cx="50" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
+            <ellipse cx="70" cy="50" fill="#061224" rx="3.5" ry="4.5"></ellipse>
+            <circle cx="51.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
+            <circle cx="71.5" cy="48.5" fill="#FFFFFF" r="1.4"></circle>
+            <circle cx="43" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
+            <circle cx="77" cy="57" fill="#60A5FA" fill-opacity="0.45" r="3.2"></circle>
+            <path d="M57 58C58.8 60 61.2 60 63 58" stroke="#0B2042" stroke-linecap="round" stroke-width="1.8"></path>
+          </svg>
+        </div>
+        <p class="text-sm font-bold text-white">Queue Clear!</p>
+        <p class="text-xs text-white/50 mt-1 max-w-[240px]">No members are waiting for attendance verification right now.</p>
+      </div>
+    `;
+    return;
+  }
+
+  STATE.coordinatorOptedInQueue.forEach(item => {
+    const prof = item.profiles || {};
+    const name = prof.name || 'Club Member';
+    const roll = prof.roll_no || '';
+    const dept = prof.department || '';
+    const year = prof.batch_year ? `${prof.batch_year} Batch` : '';
+    const timeStr = formatTimeString(item.created_at);
+
+    const card = document.createElement('div');
+    card.className = 'zentra-card-elevated p-3.5 rounded-2xl border border-amber-400/25 space-y-2.5 shadow-md';
+    card.innerHTML = `
+      <div class="flex items-start justify-between">
+        <div class="flex items-start space-x-3 truncate">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+            ${(name[0] || 'M').toUpperCase()}
+          </div>
+          <div class="truncate">
+            <div class="flex items-center space-x-1.5 flex-wrap">
+              <span class="text-sm font-bold text-white truncate">${name}</span>
+              ${roll ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">${roll}</span>` : ''}
+            </div>
+            <p class="text-[11px] text-white/60 truncate mt-0.5">
+              ${dept ? `${dept} • ` : ''}${year}
+            </p>
+            <p class="text-[10px] text-amber-300/80 mt-0.5">Opted in at ${timeStr}</p>
+          </div>
+        </div>
+        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30 shrink-0">
+          Opted-In
+        </span>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-white/[0.06]">
+        <button 
+          onclick="coordinatorRejectStudent('${item.id}')" 
+          class="tap-scale px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold hover:bg-red-500/20 transition"
+        >
+          ✕ Reject
+        </button>
+        <button 
+          onclick="coordinatorApproveStudent('${item.id}')" 
+          ${canApprove ? '' : 'disabled'}
+          class="tap-scale px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-md hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ✓ Approve Present
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function coordinatorApproveStudent(attendanceId) {
+  if (!STATE.currentUser || !STATE.supabase) return;
+  if (STATE.currentUser.role === 'coordinator' && STATE.currentUser.can_approve_attendance === false) {
+    showToast("⚠️ Your approval permissions are paused by Admin");
+    return;
+  }
+
+  try {
+    const { error } = await STATE.supabase
+      .from('attendance')
+      .update({ status: 'PRESENT' })
+      .eq('id', attendanceId);
+
+    if (error) {
+      showToast(error.message || "Approval failed");
+      return;
+    }
+
+    playChime(true);
+    showToast("✓ Attendance approved!");
+    await loadCoordinatorData();
+    if (STATE.currentUser.role === 'admin') {
+      await loadAdminData();
+    }
+  } catch (err) {
+    console.error("coordinatorApproveStudent error:", err);
+    showToast("Error approving attendance");
+  }
+}
+
+async function coordinatorRejectStudent(attendanceId) {
+  if (!STATE.currentUser || !STATE.supabase) return;
+
+  try {
+    const { error } = await STATE.supabase
+      .from('attendance')
+      .update({ status: 'REJECTED' })
+      .eq('id', attendanceId);
+
+    if (error) {
+      showToast(error.message || "Action failed");
+      return;
+    }
+
+    playChime(false);
+    showToast("Opt-in rejected");
+    await loadCoordinatorData();
+    if (STATE.currentUser.role === 'admin') {
+      await loadAdminData();
+    }
+  } catch (err) {
+    console.error("coordinatorRejectStudent error:", err);
+    showToast("Error rejecting attendance");
+  }
+}
+
+async function coordinatorApproveAllToday() {
+  if (!STATE.currentUser || !STATE.supabase) return;
+  if (STATE.currentUser.role === 'coordinator' && STATE.currentUser.can_approve_attendance === false) {
+    showToast("⚠️ Your approval permissions are paused by Admin");
+    return;
+  }
+
+  const todayStr = getTodayDateString();
+  try {
+    const { error } = await STATE.supabase
+      .from('attendance')
+      .update({ status: 'PRESENT' })
+      .eq('attendance_date', todayStr)
+      .eq('status', 'OPTED_IN');
+
+    if (error) {
+      showToast(error.message || "Failed to approve all");
+      return;
+    }
+
+    playChime(true);
+    triggerConfetti();
+    showToast("✓ All pending members approved!");
+    await loadCoordinatorData();
+    if (STATE.currentUser.role === 'admin') {
+      await loadAdminData();
+    }
+  } catch (err) {
+    console.error("coordinatorApproveAllToday error:", err);
+    showToast("Error approving all");
+  }
+}
+
+async function toggleCoordinatorPermission(coordinatorId, newStatus) {
+  if (!STATE.currentUser || STATE.currentUser.role !== 'admin' || !STATE.supabase) {
+    showToast("Admin access required");
+    return;
+  }
+
+  try {
+    const { error } = await STATE.supabase
+      .from('profiles')
+      .update({ can_approve_attendance: newStatus })
+      .eq('id', coordinatorId);
+
+    if (error) {
+      showToast(error.message || "Could not update permission");
+      return;
+    }
+
+    playChime(true);
+    showToast(newStatus ? "✓ Attendance approval rights enabled" : "⚠️ Attendance approval rights paused");
+    await loadAdminData();
+  } catch (err) {
+    console.error("toggleCoordinatorPermission error:", err);
+    showToast("Failed to toggle permission");
+  }
+}
+
+async function adminApproveCoordinator(coordinatorId) {
+  if (!STATE.currentUser || STATE.currentUser.role !== 'admin' || !STATE.supabase) {
+    showToast("Admin access required");
+    return;
+  }
+
+  showGhostLoading("Approving coordinator...");
+  try {
+    const { error } = await STATE.supabase
+      .from('profiles')
+      .update({ 
+        approval_status: 'approved',
+        can_approve_attendance: true
+      })
+      .eq('id', coordinatorId);
+
+    if (error) throw error;
+
+    playChime(true);
+    showToast("✓ Coordinator approved with attendance rights!");
+    await loadAdminData();
+  } catch (err) {
+    console.error("adminApproveCoordinator error:", err);
+    showToast("Failed to approve coordinator: " + err.message);
+  } finally {
+    hideGhostLoading();
+  }
+}
+
+// ------------------------------------------------------------------------------
+// 11. GLOBAL LEADERBOARD (FOR ALL USERS)
+// ------------------------------------------------------------------------------
+async function loadGlobalLeaderboard() {
+  if (!STATE.supabase) return;
+
+  try {
+    // 1. Fetch approved members and coordinators (exclude admin)
+    const { data: users, error: uErr } = await STATE.supabase
+      .from('profiles')
+      .select('id, name, roll_no, department, batch_year, role, approval_status')
+      .eq('approval_status', 'approved')
+      .neq('role', 'admin');
+
+    if (uErr) throw uErr;
+
+    // 2. Fetch all verified present attendance records
+    const { data: records, error: aErr } = await STATE.supabase
+      .from('attendance')
+      .select('id, user_id, attendance_date, status')
+      .eq('status', 'PRESENT');
+
+    if (aErr) throw aErr;
+
+    STATE.leaderboardUsers = users || [];
+    STATE.leaderboardAttendance = records || [];
+
+    renderLeaderboard();
+  } catch (err) {
+    console.error("loadGlobalLeaderboard error:", err);
+    showToast("Could not refresh leaderboard");
+  }
+}
+
+function filterLeaderboardList(query) {
+  STATE.leaderboardFilterText = (query || '').trim().toLowerCase();
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const users = STATE.leaderboardUsers || [];
+  const records = STATE.leaderboardAttendance || [];
+
+  const uniqueDates = [...new Set(records.map(r => r.attendance_date))];
+  const totalSessions = Math.max(uniqueDates.length, 1);
+
+  // Calculate stats for all members
+  const rankedList = users.map(u => {
+    const userRecords = records.filter(r => r.user_id === u.id);
+    const presentCount = userRecords.length;
+    const rate = Math.min(100, Math.round((presentCount / totalSessions) * 100));
+    return {
+      ...u,
+      presentCount,
+      rate
+    };
+  });
+
+  // Sort descending by presentCount, then rate, then name
+  rankedList.sort((a, b) => {
+    if (b.presentCount !== a.presentCount) return b.presentCount - a.presentCount;
+    if (b.rate !== a.rate) return b.rate - a.rate;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  // Summary Cards
+  const totalSessionsEl = document.getElementById('lbTotalSessions');
+  const activeCountEl = document.getElementById('lbActiveCount');
+  const topRateEl = document.getElementById('lbTopRate');
+
+  if (totalSessionsEl) totalSessionsEl.textContent = `${uniqueDates.length} Days`;
+  if (activeCountEl) activeCountEl.textContent = rankedList.filter(u => u.presentCount > 0).length;
+  if (topRateEl) {
+    const highest = rankedList.length > 0 ? rankedList[0].rate : 0;
+    topRateEl.textContent = `${highest}%`;
+  }
+
+  // Current User Standing Card
+  const standingCard = document.getElementById('currentUserStandingCard');
+  if (standingCard && STATE.currentUser) {
+    const myIndex = rankedList.findIndex(u => u.id === STATE.currentUser.id);
+    if (myIndex !== -1) {
+      const myData = rankedList[myIndex];
+      const rankBadge = document.getElementById('userStandingRankBadge');
+      const textEl = document.getElementById('userStandingText');
+      const rateEl = document.getElementById('userStandingRate');
+
+      if (rankBadge) rankBadge.textContent = `#${myIndex + 1}`;
+      if (textEl) textEl.textContent = `${myData.presentCount} of ${uniqueDates.length} sessions attended`;
+      if (rateEl) rateEl.textContent = `${myData.rate}%`;
+      standingCard.classList.remove('hidden');
+    } else {
+      standingCard.classList.add('hidden');
+    }
+  }
+
+  const podiumEl = document.getElementById('leaderboardPodium');
+  const listEl = document.getElementById('leaderboardList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  const filterQuery = STATE.leaderboardFilterText || '';
+  const isFiltering = filterQuery.length > 0;
+
+  // If filtering, hide podium and filter list
+  if (podiumEl) {
+    if (isFiltering || rankedList.length === 0) {
+      podiumEl.innerHTML = '';
+      podiumEl.classList.add('hidden');
+    } else {
+      podiumEl.classList.remove('hidden');
+      renderPodium(rankedList.slice(0, 3), totalSessions);
+    }
+  }
+
+  const filteredList = isFiltering
+    ? rankedList.filter(u => 
+        (u.name || '').toLowerCase().includes(filterQuery) ||
+        (u.roll_no || '').toLowerCase().includes(filterQuery) ||
+        (u.department || '').toLowerCase().includes(filterQuery)
+      )
+    : (rankedList.length > 3 ? rankedList.slice(3) : []);
+
+  if (filteredList.length === 0 && (!podiumEl || podiumEl.classList.contains('hidden'))) {
+    listEl.innerHTML = `
+      <div class="py-12 text-center text-white/40 text-xs">
+        ${isFiltering ? 'No matching members found.' : 'No members registered yet.'}
+      </div>
+    `;
+    return;
+  }
+
+  filteredList.forEach((member, idx) => {
+    const actualRank = isFiltering 
+      ? (rankedList.findIndex(u => u.id === member.id) + 1) 
+      : (idx + 4);
+
+    const isCurrentUser = STATE.currentUser && STATE.currentUser.id === member.id;
+
+    const row = document.createElement('div');
+    row.className = `zentra-card-elevated p-3.5 rounded-2xl border transition-all duration-200 space-y-2 ${
+      isCurrentUser 
+        ? 'border-[#2F7FF5] bg-[#2F7FF5]/10 shadow-[0_0_16px_rgba(47,127,245,0.2)]' 
+        : 'border-white/10'
+    }`;
+
+    row.innerHTML = `
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5 truncate pr-2">
+          <span class="w-6 h-6 rounded-lg bg-white/10 text-white/80 font-mono text-xs font-bold flex items-center justify-center shrink-0">
+            #${actualRank}
+          </span>
+          <div class="truncate">
+            <div class="flex items-center space-x-1.5 flex-wrap">
+              <span class="text-sm font-bold text-white truncate">${member.name}</span>
+              ${member.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">${member.roll_no}</span>` : ''}
+              ${isCurrentUser ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#2F7FF5] text-white">YOU</span>' : ''}
+              ${member.role === 'coordinator' ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">🎖️ Coord</span>' : ''}
+            </div>
+            <p class="text-[11px] text-white/50 truncate mt-0.5">
+              ${member.department ? `${member.department} • ` : ''}${member.batch_year ? `${member.batch_year} Batch` : ''}
+            </p>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <span class="text-sm font-black text-white">${member.presentCount} <span class="text-[10px] font-normal text-white/50">Days</span></span>
+          <span class="text-[10px] font-bold block text-[#529BF8]">${member.rate}%</span>
+        </div>
+      </div>
+
+      <div class="w-full bg-white/[0.08] rounded-full h-1.5 overflow-hidden">
+        <div class="h-full rounded-full bg-gradient-to-r from-[#2F7FF5] to-[#529BF8]" style="width: ${member.rate}%"></div>
+      </div>
+    `;
+    listEl.appendChild(row);
+  });
+}
+
+function renderPodium(top3, totalSessions) {
+  const podiumEl = document.getElementById('leaderboardPodium');
+  if (!podiumEl || top3.length === 0) return;
+
+  const first = top3[0];
+  const second = top3[1];
+  const third = top3[2];
+
+  podiumEl.innerHTML = `
+    <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-2">
+      <!-- 2nd PLACE (SILVER) -->
+      ${second ? `
+        <div class="flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-400 to-slate-200 text-black font-black text-sm flex items-center justify-center shadow-lg mb-1.5 border-2 border-white/40">
+            🥈
+          </div>
+          <span class="text-xs font-bold text-white truncate max-w-full block px-1">${second.name}</span>
+          ${second.roll_no ? `<span class="text-[9px] font-mono text-blue-300 font-bold">${second.roll_no}</span>` : ''}
+          <div class="mt-2 w-full h-20 rounded-2xl bg-white/[0.06] border border-white/10 flex flex-col items-center justify-center p-1">
+            <span class="text-xs font-black text-white">${second.presentCount}d</span>
+            <span class="text-[10px] font-bold text-slate-300">${second.rate}%</span>
+          </div>
+        </div>
+      ` : '<div class="h-10"></div>'}
+
+      <!-- 1st PLACE (GOLD) -->
+      ${first ? `
+        <div class="flex flex-col items-center text-center -mt-3">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-black font-black text-lg flex items-center justify-center shadow-[0_0_20px_rgba(251,191,36,0.35)] mb-1.5 border-2 border-amber-300">
+            🥇
+          </div>
+          <span class="text-xs font-black text-white truncate max-w-full block px-1">${first.name}</span>
+          ${first.roll_no ? `<span class="text-[9px] font-mono text-amber-300 font-bold">${first.roll_no}</span>` : ''}
+          <div class="mt-2 w-full h-24 rounded-2xl bg-gradient-to-b from-amber-500/20 to-amber-500/5 border border-amber-400/40 flex flex-col items-center justify-center p-1 shadow-lg">
+            <span class="text-sm font-black text-amber-300">${first.presentCount}d</span>
+            <span class="text-[11px] font-black text-white">${first.rate}%</span>
+          </div>
+        </div>
+      ` : '<div class="h-10"></div>'}
+
+      <!-- 3rd PLACE (BRONZE) -->
+      ${third ? `
+        <div class="flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-700 to-amber-500 text-white font-black text-sm flex items-center justify-center shadow-lg mb-1.5 border-2 border-amber-600/60">
+            🥉
+          </div>
+          <span class="text-xs font-bold text-white truncate max-w-full block px-1">${third.name}</span>
+          ${third.roll_no ? `<span class="text-[9px] font-mono text-blue-300 font-bold">${third.roll_no}</span>` : ''}
+          <div class="mt-2 w-full h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col items-center justify-center p-1">
+            <span class="text-xs font-black text-white">${third.presentCount}d</span>
+            <span class="text-[10px] font-bold text-amber-400/80">${third.rate}%</span>
+          </div>
+        </div>
+      ` : '<div class="h-10"></div>'}
+    </div>
+  `;
+}
+
+// ------------------------------------------------------------------------------
+// 12. INITIALIZATION ON PAGE LOAD
 // ------------------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', () => {
   setupDateDisplay();
   setupPwa();
   checkAuthSession();
 });
+

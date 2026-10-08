@@ -21,26 +21,39 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   roll_no TEXT,              -- PSG Tech Roll number (e.g. 23S042)
   department TEXT,           -- Auto-detected department (e.g. B.Sc. Applied Science)
   batch_year TEXT,           -- Auto-detected batch year (e.g. 2023)
-  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin')),
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'coordinator', 'admin')),
   approval_status TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+  can_approve_attendance BOOLEAN NOT NULL DEFAULT true, -- Admin-controlled permission for coordinators
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Schema migration helpers if profiles table already exists
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('student', 'coordinator', 'admin'));
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS can_approve_attendance BOOLEAN NOT NULL DEFAULT true;
 
 -- 4. ATTENDANCE TABLE
 CREATE TABLE IF NOT EXISTS public.attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   attendance_date DATE NOT NULL,
-  status TEXT NOT NULL DEFAULT 'PRESENT',
+  status TEXT NOT NULL DEFAULT 'OPTED_IN' CHECK (status IN ('OPTED_IN', 'PRESENT', 'ABSENT', 'REJECTED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT unique_user_attendance_date UNIQUE (user_id, attendance_date)
 );
 
+-- Schema migration helpers for attendance table if already exists
+ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS attendance_status_check;
+ALTER TABLE public.attendance ADD CONSTRAINT attendance_status_check CHECK (status IN ('OPTED_IN', 'PRESENT', 'ABSENT', 'REJECTED'));
+ALTER TABLE public.attendance ALTER COLUMN status SET DEFAULT 'OPTED_IN';
+
 -- Index for speedy attendance queries
 CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON public.attendance(user_id, attendance_date DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON public.attendance(attendance_date DESC);
+CREATE INDEX IF NOT EXISTS idx_attendance_date_status ON public.attendance(attendance_date DESC, status);
 
--- 5. HELPER FUNCTION: Check if current authenticated user is Admin (bypasses RLS recursion)
+-- 5. HELPER FUNCTIONS FOR ROLES & PERMISSIONS
+-- 5a. Check if current authenticated user is Super Admin
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -48,6 +61,34 @@ RETURNS BOOLEAN AS $$
     WHERE id = auth.uid() AND role = 'admin'
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- 5b. Check if current user is Approved Coordinator or Admin
+CREATE OR REPLACE FUNCTION public.is_coordinator()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() 
+      AND role IN ('coordinator', 'admin') 
+      AND approval_status = 'approved'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- 5c. Check if user is Admin OR Coordinator with active attendance permission
+CREATE OR REPLACE FUNCTION public.can_approve_attendance()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() 
+      AND (
+        role = 'admin' 
+        OR (role = 'coordinator' AND approval_status = 'approved' AND can_approve_attendance = true)
+      )
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_coordinator() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.can_approve_attendance() TO anon, authenticated;
 
 -- 6. HELPER FUNCTION: Get total registered user count
 CREATE OR REPLACE FUNCTION public.get_user_count()
@@ -176,6 +217,12 @@ BEGIN
   user_dept := COALESCE(NEW.raw_user_meta_data->>'department', '');
   user_year := COALESCE(NEW.raw_user_meta_data->>'batch_year', '');
 
+  -- Allow registering as Coordinator (Admin must approve!)
+  IF (NEW.raw_user_meta_data->>'role') = 'coordinator' AND current_count > 0 THEN
+    assigned_role := 'coordinator';
+    assigned_status := 'pending';
+  END IF;
+
   -- Enforce one-time registration per roll number
   IF user_roll IS NOT NULL AND TRIM(user_roll) <> '' THEN
     IF EXISTS (SELECT 1 FROM public.profiles WHERE LOWER(TRIM(roll_no)) = LOWER(TRIM(user_roll)) AND id <> NEW.id) THEN
@@ -184,8 +231,8 @@ BEGIN
   END IF;
 
   -- Insert profile
-  INSERT INTO public.profiles (id, name, identifier, roll_no, department, batch_year, role, approval_status, created_at)
-  VALUES (NEW.id, user_name, user_ident, user_roll, user_dept, user_year, assigned_role, assigned_status, NOW())
+  INSERT INTO public.profiles (id, name, identifier, roll_no, department, batch_year, role, approval_status, can_approve_attendance, created_at)
+  VALUES (NEW.id, user_name, user_ident, user_roll, user_dept, user_year, assigned_role, assigned_status, true, NOW())
   ON CONFLICT (id) DO UPDATE
   SET name = EXCLUDED.name,
       identifier = EXCLUDED.identifier,
@@ -216,6 +263,58 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.admin_delete_user(UUID) TO authenticated;
 
+-- 8b. COORDINATOR & ADMIN ATTENDANCE APPROVAL RPCs
+CREATE OR REPLACE FUNCTION public.coordinator_approve_attendance(p_attendance_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  IF NOT public.can_approve_attendance() THEN
+    RAISE EXCEPTION 'Unauthorized: You do not have permission to approve attendance.';
+  END IF;
+
+  UPDATE public.attendance
+  SET status = 'PRESENT'
+  WHERE id = p_attendance_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.coordinator_approve_attendance(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.coordinator_approve_all_today(p_date DATE)
+RETURNS INT AS $$
+DECLARE
+  v_count INT;
+BEGIN
+  IF NOT public.can_approve_attendance() THEN
+    RAISE EXCEPTION 'Unauthorized: You do not have permission to approve attendance.';
+  END IF;
+
+  UPDATE public.attendance
+  SET status = 'PRESENT'
+  WHERE attendance_date = p_date AND status = 'OPTED_IN';
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.coordinator_approve_all_today(DATE) TO authenticated;
+
+-- 8c. ADMIN TOGGLE COORDINATOR PERMISSION RPC
+CREATE OR REPLACE FUNCTION public.admin_toggle_coordinator_permission(p_coordinator_id UUID, p_can_approve BOOLEAN)
+RETURNS VOID AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Unauthorized: Only administrators can modify coordinator permissions.';
+  END IF;
+
+  UPDATE public.profiles
+  SET can_approve_attendance = p_can_approve
+  WHERE id = p_coordinator_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.admin_toggle_coordinator_permission(UUID, BOOLEAN) TO authenticated;
+
 -- 9. ENABLE ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
@@ -228,14 +327,15 @@ DROP POLICY IF EXISTS "Profiles delete policy" ON public.profiles;
 
 DROP POLICY IF EXISTS "Attendance select policy" ON public.attendance;
 DROP POLICY IF EXISTS "Attendance insert policy" ON public.attendance;
+DROP POLICY IF EXISTS "Attendance update policy" ON public.attendance;
 DROP POLICY IF EXISTS "Attendance delete policy" ON public.attendance;
 
 -- PROFILES POLICIES
--- Students can read their own profile, Admins can read all profiles
+-- All authenticated members, coordinators, and admins can read profiles (for club leaderboard & directory)
 CREATE POLICY "Profiles select policy"
   ON public.profiles FOR SELECT
   TO authenticated
-  USING (id = auth.uid() OR public.is_admin());
+  USING (true);
 
 -- Profile insertion by authenticated user or admin
 CREATE POLICY "Profiles insert policy"
@@ -243,7 +343,7 @@ CREATE POLICY "Profiles insert policy"
   TO authenticated
   WITH CHECK (id = auth.uid() OR public.is_admin());
 
--- Admins can update any profile (e.g., approval_status); user can update own profile
+-- Admins can update any profile (e.g., approval_status, can_approve_attendance); user can update own profile
 CREATE POLICY "Profiles update policy"
   ON public.profiles FOR UPDATE
   TO authenticated
@@ -256,13 +356,13 @@ CREATE POLICY "Profiles delete policy"
   USING (public.is_admin());
 
 -- ATTENDANCE POLICIES
--- Students see their own attendance, Admins see all attendance records
+-- All authenticated members can read attendance records to compute the global club leaderboard
 CREATE POLICY "Attendance select policy"
   ON public.attendance FOR SELECT
   TO authenticated
-  USING (user_id = auth.uid() OR public.is_admin());
+  USING (true);
 
--- Approved students can insert attendance for themselves
+-- Approved students can insert attendance (opt in) for themselves
 CREATE POLICY "Attendance insert policy"
   ON public.attendance FOR INSERT
   TO authenticated
@@ -274,15 +374,19 @@ CREATE POLICY "Attendance insert policy"
     )
   );
 
--- Students can ONLY delete their own attendance record for TODAY (cannot delete past dates)
--- Uses timezone-resilient timestamp check ensuring local timezones never conflict with UTC
--- Admins can also delete if necessary
+-- Coordinators with permission and Admins can update attendance (approve opted-in students)
+CREATE POLICY "Attendance update policy"
+  ON public.attendance FOR UPDATE
+  TO authenticated
+  USING (public.can_approve_attendance());
+
+-- Students can delete their own opt-in for TODAY; Coordinators with permission and Admins can delete
 CREATE POLICY "Attendance delete policy"
   ON public.attendance FOR DELETE
   TO authenticated
   USING (
     (user_id = auth.uid() AND (created_at >= NOW() - INTERVAL '36 hours' OR attendance_date >= CURRENT_DATE - 1))
-    OR public.is_admin()
+    OR public.can_approve_attendance()
   );
 
 -- 10. ADMIN WIPE FUNCTIONS (For complete database reset directly from app)

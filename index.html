@@ -423,8 +423,14 @@
         </div>
       </div>
 
-      <!-- Quick Actions: Logout (shown when authenticated) -->
+      <!-- Quick Actions: Install App & Logout -->
       <div class="flex items-center space-x-2">
+        <button id="headerInstallBtn" onclick="handleInstallPwa()" class="hidden text-[11px] font-bold text-white bg-gradient-to-r from-[#2F7FF5] to-[#1D6FE5] hover:opacity-95 px-3 py-1 rounded-full border border-blue-400/30 transition shadow-[0_2px_10px_rgba(47,127,245,0.35)] flex items-center space-x-1" title="Install App">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          <span>Install</span>
+        </button>
         <button id="authToggleBtn" class="hidden text-[11px] font-semibold text-white/80 hover:text-white bg-white/[0.08] hover:bg-white/[0.15] px-3 py-1 rounded-full border border-white/10 transition shadow-sm" title="Logout">
           Logout
         </button>
@@ -581,6 +587,36 @@
           </div>
 
           <form id="signupForm" class="space-y-3" onsubmit="event.preventDefault(); handleSignup();">
+            <!-- Account Role Selector: Member vs Coordinator -->
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Register As</label>
+              <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-white/[0.04] border border-white/10">
+                <button 
+                  type="button" 
+                  id="roleBtnMember" 
+                  onclick="setSignupRole('student')" 
+                  class="tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 bg-[#2F7FF5] text-white shadow-md"
+                >
+                  <span>👤</span>
+                  <span>Club Member</span>
+                </button>
+                <button 
+                  type="button" 
+                  id="roleBtnCoordinator" 
+                  onclick="setSignupRole('coordinator')" 
+                  class="tap-scale py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-white/60 hover:text-white"
+                >
+                  <span>🎖️</span>
+                  <span>Coordinator</span>
+                </button>
+              </div>
+              <input type="hidden" id="signupRole" value="student">
+              <div id="coordinatorRoleNotice" class="hidden mt-2 p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-200 text-[11px] flex items-start space-x-2">
+                <span class="text-base shrink-0">🛡️</span>
+                <span><strong>Coordinator Notice:</strong> Coordinator accounts require Club Admin approval before you can verify and take attendance.</span>
+              </div>
+            </div>
+
             <!-- Full Name -->
             <div>
               <label class="block text-[11px] font-semibold uppercase tracking-wider text-white/60 mb-1 pl-1">Full Name</label>
@@ -1027,7 +1063,7 @@
         <!-- Center Focus: Primary Attendance Action Button (Staggered Animation 2) -->
         <div class="anim-stagger-2 my-auto py-5 flex flex-col items-center justify-center relative">
           
-          <!-- STATE A: UNMARKED (Ready to mark) -->
+          <!-- STATE A: UNMARKED (Ready to opt-in) -->
           <div id="unmarkedState" class="w-full flex flex-col items-center relative">
             <!-- Living Concentric Ripple Waves Radiating Outward -->
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center -z-10">
@@ -1037,45 +1073,84 @@
             </div>
 
             <button 
-              id="markAttendanceBtn"
-              onclick="markTodayAttendance()"
+              id="optInAttendanceBtn"
+              onclick="handleOptInAttendance()"
               class="tap-scale apple-pulse-aura group relative w-60 h-60 rounded-full bg-gradient-to-b from-[#183463] via-[#0E2040] to-[#081324] border border-[#4FA1FF]/60 text-white transition-all duration-300 flex flex-col items-center justify-center p-6 select-none shadow-[0_0_60px_rgba(47,127,245,0.45)]"
             >
               <!-- Specular Glass Highlight Arc -->
               <div class="pointer-events-none absolute inset-x-8 top-3 h-10 rounded-full bg-gradient-to-b from-white/20 to-transparent blur-[1px]"></div>
 
-              <!-- Glass inner orb with rich sapphire gradient & precisely centered checkmark -->
+              <!-- Glass inner orb with rich sapphire gradient -->
               <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-[#2F7FF5] to-[#70B4FF] text-white flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(47,127,245,0.7)] group-hover:scale-105 transition duration-300 ring-1 ring-white/30 overflow-hidden">
                 <svg class="w-8 h-8 text-white drop-shadow-md" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
               </div>
-              <span class="text-[11px] font-bold tracking-widest uppercase text-[#80BDFF]">TAP TO RECORD</span>
+              <span class="text-[11px] font-bold tracking-widest uppercase text-[#80BDFF]">TAP TO OPT IN</span>
               <span class="text-base font-extrabold tracking-tight mt-1 text-center text-white">
-                MARK ATTENDANCE
+                OPT IN FOR ATTENDANCE
               </span>
             </button>
-            <p class="text-[11px] text-white/50 mt-5 font-medium flex items-center space-x-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_6px_#2F7FF5]"></span>
-              <span>Instant one-tap verified check-in</span>
+            <p class="text-[11px] text-white/50 mt-5 font-medium flex items-center space-x-1.5 text-center px-4">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#2F7FF5] shadow-[0_0_6px_#2F7FF5] shrink-0"></span>
+              <span>Tap to opt in for today. A Coordinator will verify & approve you.</span>
             </p>
           </div>
 
-          <!-- STATE B: MARKED (Already checked in) -->
+          <!-- STATE B: OPTED IN (Awaiting Coordinator Approval) -->
+          <div id="optedInState" class="hidden w-full flex flex-col items-center screen-fade relative">
+            <!-- Living Amber Pulsing Wave -->
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center -z-10">
+              <div class="absolute w-60 h-60 rounded-full border border-amber-400/40 ripple-wave-1"></div>
+              <div class="absolute w-60 h-60 rounded-full border border-amber-300/25 ripple-wave-2"></div>
+              <div class="orb-halo absolute w-72 h-72 rounded-full bg-gradient-to-b from-amber-500/20 to-transparent blur-xl"></div>
+            </div>
+
+            <div class="relative overflow-hidden w-60 h-60 rounded-full bg-gradient-to-b from-[#2E1E05] via-[#1F1504] to-[#120B02] border border-amber-400/70 flex flex-col items-center justify-center p-6 shadow-[0_0_55px_rgba(245,158,11,0.45)]">
+              <!-- Specular Glass Highlight Arc -->
+              <div class="pointer-events-none absolute inset-x-8 top-3 h-10 rounded-full bg-gradient-to-b from-white/20 to-transparent blur-[1px]"></div>
+
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-black flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(245,158,11,0.8)] ring-1 ring-white/30 animate-pulse">
+                <svg class="w-9 h-9 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span class="text-amber-300 font-black tracking-wider text-lg">⏳ OPTED IN</span>
+              <span class="text-[10px] font-bold text-amber-200/90 uppercase tracking-widest mt-0.5">AWAITING APPROVAL</span>
+              <span id="optedInTimestamp" class="text-[11px] font-medium text-white/70 mt-1">Opted in at --:--</span>
+            </div>
+
+            <!-- Cancel Opt-In Action -->
+            <button 
+              onclick="cancelTodayOptIn()"
+              class="tap-scale mt-5 inline-flex items-center space-x-2 px-4 py-2 text-xs font-semibold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 rounded-xl transition border border-amber-500/20 shadow-sm"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Cancel Today's Opt-In</span>
+            </button>
+            <p class="text-[10px] text-white/40 mt-2 text-center max-w-[260px]">
+              Screen updates live once a club coordinator approves your attendance.
+            </p>
+          </div>
+
+          <!-- STATE C: APPROVED / PRESENT -->
           <div id="markedState" class="hidden w-full flex flex-col items-center screen-fade relative">
             <!-- Ambient Aura behind marked state -->
             <div class="pointer-events-none absolute w-72 h-72 rounded-full bg-gradient-to-b from-[#2F7FF5]/25 to-transparent blur-2xl -z-10 ghost-aura"></div>
 
-            <div class="relative overflow-hidden w-60 h-60 rounded-full bg-gradient-to-b from-[#142B52] to-[#0A162B] border border-[#529BF8]/80 flex flex-col items-center justify-center p-6 shadow-[0_0_55px_rgba(47,127,245,0.55)] sheen-active">
+            <div class="relative overflow-hidden w-60 h-60 rounded-full bg-gradient-to-b from-[#0A2616] via-[#0E2040] to-[#0A162B] border border-emerald-400/80 flex flex-col items-center justify-center p-6 shadow-[0_0_55px_rgba(16,185,129,0.5)] sheen-active">
               <!-- Specular Glass Highlight Arc -->
               <div class="pointer-events-none absolute inset-x-8 top-3 h-10 rounded-full bg-gradient-to-b from-white/20 to-transparent blur-[1px]"></div>
 
-              <div class="w-20 h-20 rounded-full bg-[#2F7FF5] text-white flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(47,127,245,0.85)] ring-1 ring-white/30 overflow-hidden">
-                <svg class="w-8 h-8 drop-shadow" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mb-3 shadow-[0_0_35px_rgba(16,185,129,0.85)] ring-1 ring-white/30 overflow-hidden">
+                <svg class="w-9 h-9 drop-shadow" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
               </div>
               <span class="text-white font-black tracking-wider text-xl">✓ PRESENT</span>
+              <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-widest mt-0.5">APPROVED BY COORDINATOR</span>
               <span id="markedTimestamp" class="text-xs font-semibold text-white/80 mt-1">Logged today at 09:41 AM</span>
             </div>
 
@@ -1172,7 +1247,140 @@
       </section>
 
       <!-- ============================================== -->
-      <!-- SCREEN 6: ADMIN AREA -->
+      <!-- SCREEN 6: GLOBAL LEADERBOARD (FOR ALL USERS) -->
+      <!-- ============================================== -->
+      <section id="screenLeaderboard" class="hidden flex-1 flex-col px-5 pt-4 pb-4 screen-fade overflow-y-auto no-scrollbar">
+        <!-- Ambient Glow -->
+        <div class="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-amber-500/15 via-[#2F7FF5]/10 to-transparent blur-3xl -z-10"></div>
+
+        <!-- Header -->
+        <div class="mb-3.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-widest text-amber-300 bg-amber-400/15 px-2.5 py-0.5 rounded-full border border-amber-400/30 flex items-center space-x-1">
+              <span>🏆</span>
+              <span>Hall of Fame</span>
+            </span>
+            <button onclick="loadGlobalLeaderboard()" class="tap-scale p-1.5 rounded-xl text-white/60 hover:text-white bg-white/[0.06] border border-white/10" title="Refresh">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+          <h2 class="text-2xl font-black tracking-tight text-white mt-1">Club Leaderboard</h2>
+          <p class="text-[11px] text-white/50 mt-0.5">Rankings based on verified club session attendance</p>
+        </div>
+
+        <!-- Summary Statistics Card -->
+        <div class="zentra-card p-3.5 rounded-2xl flex items-center justify-between text-xs border border-white/10 mb-3.5 shadow-sm">
+          <div>
+            <span class="text-white/50 text-[10px] uppercase font-bold tracking-wider block">Total Sessions</span>
+            <span id="lbTotalSessions" class="text-base font-black text-white">0 Days</span>
+          </div>
+          <div class="text-center">
+            <span class="text-white/50 text-[10px] uppercase font-bold tracking-wider block">Active Members</span>
+            <span id="lbActiveCount" class="text-base font-black text-[#529BF8]">0</span>
+          </div>
+          <div class="text-right">
+            <span class="text-white/50 text-[10px] uppercase font-bold tracking-wider block">Top Rate</span>
+            <span id="lbTopRate" class="text-base font-black text-amber-400">0%</span>
+          </div>
+        </div>
+
+        <!-- Current User Standing Highlight Card -->
+        <div id="currentUserStandingCard" class="hidden mb-3.5 p-3 rounded-2xl bg-gradient-to-r from-[#2F7FF5]/20 to-[#1D6FE5]/20 border border-[#2F7FF5]/40 flex items-center justify-between shadow-lg">
+          <div class="flex items-center space-x-2.5">
+            <div id="userStandingRankBadge" class="w-8 h-8 rounded-xl bg-[#2F7FF5] text-white font-black text-xs flex items-center justify-center shadow-md">#--</div>
+            <div>
+              <span class="text-xs font-bold text-white block">Your Standing</span>
+              <span id="userStandingText" class="text-[11px] text-blue-200/80">0 days attended</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span id="userStandingRate" class="text-sm font-black text-white">0%</span>
+            <span class="text-[10px] text-white/50 block">Attendance</span>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="mb-3 relative">
+          <input 
+            type="text" 
+            id="leaderboardSearchInput" 
+            placeholder="Search member name or roll number..." 
+            oninput="filterLeaderboardList(this.value)"
+            class="w-full pl-9 pr-3 py-2 zentra-card rounded-xl text-white text-xs font-medium placeholder-white/30 focus:outline-none focus:border-[#2F7FF5] transition"
+          >
+          <svg class="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+        </div>
+
+        <!-- Top 3 Podium Container -->
+        <div id="leaderboardPodium" class="mb-3.5">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Full Ranked List -->
+        <div id="leaderboardList" class="space-y-2.5 pb-6">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- SCREEN 7: COORDINATOR APPROVAL PORTAL -->
+      <!-- ============================================== -->
+      <section id="screenCoordinator" class="hidden flex-1 flex-col px-5 pt-4 pb-4 screen-fade overflow-y-auto no-scrollbar">
+        <!-- Ambient Glow -->
+        <div class="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-radial from-cyan-500/15 via-[#2F7FF5]/10 to-transparent blur-3xl -z-10"></div>
+
+        <!-- Header -->
+        <div class="mb-3.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-widest text-[#529BF8] bg-[#2F7FF5]/15 px-2.5 py-0.5 rounded-full border border-[#2F7FF5]/30 flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#529BF8] animate-pulse"></span>
+              <span>Coordinator Portal</span>
+            </span>
+            <span id="coordPermissionBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              🟢 Active
+            </span>
+          </div>
+          <h2 class="text-2xl font-bold tracking-tight text-white mt-1">Today's Opt-Ins</h2>
+          <p class="text-[11px] text-white/50 mt-0.5">Verify and approve club members for today's session</p>
+        </div>
+
+        <!-- Permission Notice (Shown if Admin paused permission) -->
+        <div id="coordPermissionWarning" class="hidden mb-3.5 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs flex items-start space-x-2.5 shadow-md">
+          <span class="text-base shrink-0">⚠️</span>
+          <div>
+            <span class="font-bold block text-white">Attendance Approval Rights Paused</span>
+            <span class="text-[11px] text-amber-200/80">The Club Admin has temporarily paused your approval rights. You cannot approve attendance until re-enabled.</span>
+          </div>
+        </div>
+
+        <!-- Quick Summary & Bulk Approve All -->
+        <div class="zentra-card p-3.5 rounded-2xl flex items-center justify-between text-xs border border-white/10 mb-3.5 shadow-sm">
+          <div>
+            <span class="text-white/50 text-[10px] uppercase font-bold tracking-wider block">Today's Queue</span>
+            <span class="text-base font-black text-white"><span id="coordOptedInCount">0</span> Waiting</span>
+          </div>
+          <button 
+            id="coordApproveAllBtn"
+            onclick="coordinatorApproveAllToday()" 
+            class="tap-scale px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90 text-white font-bold text-xs shadow-md transition flex items-center space-x-1.5"
+          >
+            <span>⚡</span>
+            <span>Approve All</span>
+          </button>
+        </div>
+
+        <!-- Opted In List -->
+        <div id="coordOptedInList" class="space-y-2.5 pb-6">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- SCREEN 8: ADMIN AREA -->
       <!-- ============================================== -->
       <section id="screenAdmin" class="hidden flex-1 flex-col px-6 pt-4 pb-4 screen-fade">
         <div class="mb-4">
@@ -1290,7 +1498,50 @@
         <span class="text-[10px] font-bold tracking-tight mt-1">History</span>
       </button>
 
-      <!-- ADMIN TAB 1: Approvals Dashboard (Admin only, replaces check-in) -->
+      <!-- COORDINATOR TAB 1: Opt-In Approvals Queue (Coordinators only) -->
+      <button 
+        id="tabCoordinatorApprovalsBtn" 
+        onclick="switchNavTab('coordOptIns')" 
+        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition hidden"
+      >
+        <div class="relative">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span id="navCoordOptInBadge" class="hidden absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-black">0</span>
+        </div>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Opt-Ins</span>
+      </button>
+
+      <!-- UNIVERSAL TAB: Leaderboard (For Members, Coordinators & Admin) -->
+      <button 
+        id="tabLeaderboardBtn" 
+        onclick="switchNavTab('leaderboard')" 
+        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition"
+      >
+        <div class="relative">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.004 0V5.625c0-.621-.504-1.125-1.125-1.125h-1.75c-.621 0-1.125.504-1.125 1.125v8.625m4 0H8.5" />
+          </svg>
+        </div>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Leaderboard</span>
+      </button>
+
+      <!-- COORDINATOR TAB 2: Members Directory (Coordinators only) -->
+      <button 
+        id="tabCoordinatorMembersBtn" 
+        onclick="switchNavTab('coordMembers')" 
+        class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition hidden"
+      >
+        <div class="relative">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+        </div>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Members</span>
+      </button>
+
+      <!-- ADMIN TAB 1: Approvals Dashboard (Admin only) -->
       <button 
         id="tabAdminApprovalsBtn" 
         onclick="switchAdminTab('pending')" 
@@ -1308,7 +1559,7 @@
       <!-- ADMIN TAB 2: Leaderboard (Ranked by Attendance) -->
       <button 
         id="tabAdminRankingsBtn" 
-        onclick="switchAdminTab('rank')" 
+        onclick="switchNavTab('leaderboard')" 
         class="tap-scale flex-1 flex flex-col items-center justify-center py-1 text-white/50 hover:text-white transition hidden"
       >
         <div class="relative">
@@ -1330,7 +1581,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
           </svg>
         </div>
-        <span class="text-[10px] font-bold tracking-tight mt-1">Members</span>
+        <span class="text-[10px] font-bold tracking-tight mt-1">Console</span>
       </button>
 
     </nav>
@@ -1549,6 +1800,36 @@
             Wipe Data
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- IOS SAFARI INSTALL GUIDE MODAL -->
+    <div id="iosInstallModal" class="hidden absolute inset-0 z-50 flex flex-col justify-end">
+      <div onclick="closeIosInstallModal()" class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
+      <div class="sheet-up relative w-full zentra-card-elevated rounded-t-[34px] p-6 shadow-2xl text-center z-10 border-t border-blue-400/20">
+        <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4"></div>
+        <div class="w-12 h-12 rounded-2xl bg-[#2F7FF5]/15 text-[#529BF8] border border-[#2F7FF5]/30 flex items-center justify-center mx-auto mb-3 shadow-md">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+          </svg>
+        </div>
+        <h3 class="text-base font-extrabold text-white tracking-tight">Install Manavar Illam on iPhone</h3>
+        <p class="text-xs text-white/60 mt-1 mb-4">Install in 2 simple steps for fullscreen mobile experience:</p>
+        
+        <div class="space-y-2.5 mb-5 text-left text-xs">
+          <div class="p-3 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center space-x-3">
+            <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-300 font-bold flex items-center justify-center shrink-0">1</div>
+            <p class="text-white/80">Tap the <span class="font-bold text-white">Share button</span> (square with arrow ↑) in Safari's bottom toolbar.</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center space-x-3">
+            <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-300 font-bold flex items-center justify-center shrink-0">2</div>
+            <p class="text-white/80">Scroll down and tap <span class="font-bold text-white">"Add to Home Screen" ⊞</span>, then tap <span class="font-bold text-[#529BF8]">Add</span>.</p>
+          </div>
+        </div>
+
+        <button onclick="closeIosInstallModal()" class="tap-scale w-full py-3 rounded-2xl bg-white/10 text-white text-xs font-bold hover:bg-white/15 transition">
+          Got It
+        </button>
       </div>
     </div>
 
