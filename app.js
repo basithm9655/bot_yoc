@@ -29,6 +29,7 @@ const STATE = {
   optInPollTimer: null,
   optInRealtimeChannel: null,
   coordinatorRealtimeChannel: null,
+  adminRealtimeChannel: null,
   // Leaderboard State
   leaderboardUsers: [],
   leaderboardAttendance: [],
@@ -661,8 +662,10 @@ function updateNavIcons(activeTab) {
     if (leaderboardBtn) leaderboardBtn.classList.remove('hidden');
     if (consoleBtn) consoleBtn.classList.remove('hidden');
 
-    // Update pending counter badge
-    const pendingCount = STATE.adminPendingUsers ? STATE.adminPendingUsers.length : 0;
+    // Update pending counter badge (pending user registrations + today's opt-ins)
+    const todayStr = getTodayDateString();
+    const todayOpted = (STATE.adminAttendance || []).filter(a => a.status === 'OPTED_IN' && a.attendance_date === todayStr);
+    const pendingCount = (STATE.adminPendingUsers ? STATE.adminPendingUsers.length : 0) + todayOpted.length;
     const navBadge = document.getElementById('navPendingBadge');
     if (navBadge) {
       navBadge.textContent = pendingCount;
@@ -1967,6 +1970,30 @@ async function loadAdminData() {
 
       if (attErr) throw attErr;
       STATE.adminAttendance = records || [];
+
+      // Set up Admin Realtime Queue listener once (live reactive approvals without polling)
+      if (!STATE.adminRealtimeChannel && STATE.supabase) {
+        try {
+          STATE.adminRealtimeChannel = STATE.supabase
+            .channel('admin-attendance-feed')
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'attendance'
+              },
+              () => {
+                if (STATE.currentScreen === 'admin') {
+                  loadAdminData();
+                }
+              }
+            )
+            .subscribe();
+        } catch (e) {
+          console.warn("Admin realtime subscription:", e);
+        }
+      }
     } else {
       STATE.adminAttendance = [];
     }
@@ -2008,21 +2035,25 @@ function renderAdminUI() {
   const count = STATE.adminUsers.length;
   if (capacityElem) capacityElem.textContent = count;
 
+  // Identify today's opted in attendance
+  const todayStr = getTodayDateString();
+  const optedInToday = (STATE.adminAttendance || []).filter(a => a.status === 'OPTED_IN' && a.attendance_date === todayStr);
+  const totalPendingWork = (STATE.adminPendingUsers ? STATE.adminPendingUsers.length : 0) + optedInToday.length;
+
   // Update tab counters
   const tabAllCount = document.getElementById('adminTabAllCount');
   const tabPendingCount = document.getElementById('adminTabPendingCount');
   const tabAttCount = document.getElementById('adminTabAttCount');
 
   if (tabAllCount) tabAllCount.textContent = STATE.adminUsers.length;
-  if (tabPendingCount) tabPendingCount.textContent = STATE.adminPendingUsers.length;
+  if (tabPendingCount) tabPendingCount.textContent = totalPendingWork;
   if (tabAttCount) tabAttCount.textContent = STATE.adminAttendance.length;
 
   // Update bottom nav pending counter badge
   const navBadge = document.getElementById('navPendingBadge');
   if (navBadge) {
-    const pCount = STATE.adminPendingUsers.length;
-    navBadge.textContent = pCount;
-    navBadge.classList.toggle('hidden', pCount === 0);
+    navBadge.textContent = totalPendingWork;
+    navBadge.classList.toggle('hidden', totalPendingWork === 0);
   }
 
   const container = document.getElementById('adminContentContainer');
@@ -2037,8 +2068,15 @@ function renderAdminUI() {
     const pendingCoords = pendingList.filter(u => u.role === 'coordinator');
     const pendingStudents = pendingList.filter(u => u.role !== 'coordinator');
     const approvedCoords = (STATE.adminUsers || []).filter(u => u.role === 'coordinator' && u.approval_status === 'approved');
-    const todayStr = getTodayDateString();
-    const optedInToday = (STATE.adminAttendance || []).filter(a => a.status === 'OPTED_IN' && a.attendance_date === todayStr);
+
+    const coordOptIns = optedInToday.filter(a => {
+      const u = (STATE.adminUsers || []).find(usr => usr.id === a.user_id);
+      return u && u.role === 'coordinator';
+    });
+    const studentOptIns = optedInToday.filter(a => {
+      const u = (STATE.adminUsers || []).find(usr => usr.id === a.user_id);
+      return !u || u.role !== 'coordinator';
+    });
 
     const hasAnyWork = pendingList.length > 0 || approvedCoords.length > 0 || optedInToday.length > 0;
 
@@ -2058,7 +2096,7 @@ function renderAdminUI() {
     const wrapper = document.createElement('div');
     wrapper.className = 'space-y-4';
 
-    // 1. SECTION: PENDING COORDINATORS
+    // 1. SECTION: PENDING COORDINATOR REGISTRATIONS
     if (pendingCoords.length > 0) {
       const coordSec = document.createElement('div');
       coordSec.className = 'space-y-2';
@@ -2112,7 +2150,64 @@ function renderAdminUI() {
       wrapper.appendChild(coordSec);
     }
 
-    // 2. SECTION: COORDINATOR PERMISSIONS MANAGER
+    // 2. SECTION: TODAY'S COORDINATOR ATTENDANCE OPT-INS (Awaiting Admin Approval)
+    if (coordOptIns.length > 0) {
+      const coordAttSec = document.createElement('div');
+      coordAttSec.className = 'space-y-2';
+      coordAttSec.innerHTML = `
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
+            <span>🎖️</span>
+            <span>Coordinator Attendance Opt-Ins (${coordOptIns.length})</span>
+          </span>
+          <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+            Admin Approval Required
+          </span>
+        </div>
+      `;
+
+      coordOptIns.forEach(item => {
+        const u = (STATE.adminUsers || []).find(usr => usr.id === item.user_id) || { name: 'Coordinator', roll_no: '', role: 'coordinator' };
+        const card = document.createElement('div');
+        card.className = 'zentra-card-elevated p-3.5 rounded-2xl border border-amber-400/35 shadow-lg space-y-2.5';
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex items-start space-x-3 truncate">
+              <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+                🎖️
+              </div>
+              <div class="truncate">
+                <div class="flex items-center space-x-1.5 flex-wrap">
+                  <span class="text-sm font-bold text-white truncate">${u.name}</span>
+                  ${u.roll_no ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">${u.roll_no}</span>` : ''}
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center space-x-1"><span>🎖️</span><span>Coordinator</span></span>
+                </div>
+                <p class="text-[11px] text-white/60 truncate mt-0.5">
+                  ${u.department ? `${u.department} • ` : ''}${u.batch_year ? `${u.batch_year} Batch` : ''}
+                </p>
+                <p class="text-[10px] text-amber-300/80 mt-0.5">Opted in at ${formatTimeString(item.created_at)}</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
+              Opted-In
+            </span>
+          </div>
+
+          <div class="flex items-center justify-end space-x-2 pt-2 border-t border-white/[0.06]">
+            <button onclick="coordinatorRejectStudent('${item.id}')" class="tap-scale px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/25 text-xs font-semibold hover:bg-red-500/20 transition">
+              ✕ Reject
+            </button>
+            <button onclick="coordinatorApproveStudent('${item.id}')" class="tap-scale px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-md hover:brightness-110 transition">
+              ✓ Approve Coordinator Present
+            </button>
+          </div>
+        `;
+        coordAttSec.appendChild(card);
+      });
+      wrapper.appendChild(coordAttSec);
+    }
+
+    // 3. SECTION: COORDINATOR PERMISSIONS MANAGER
     if (approvedCoords.length > 0) {
       const permSec = document.createElement('div');
       permSec.className = 'space-y-2';
@@ -2156,15 +2251,15 @@ function renderAdminUI() {
       wrapper.appendChild(permSec);
     }
 
-    // 3. SECTION: TODAY'S OPT-IN ATTENDANCE (Admin review)
-    if (optedInToday.length > 0) {
-      const optSec = document.createElement('div');
-      optSec.className = 'space-y-2';
-      optSec.innerHTML = `
+    // 4. SECTION: STUDENT ATTENDANCE OPT-INS (Can also be approved by Coordinators)
+    if (studentOptIns.length > 0) {
+      const studentAttSec = document.createElement('div');
+      studentAttSec.className = 'space-y-2';
+      studentAttSec.innerHTML = `
         <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
-            <span>⏳</span>
-            <span>Today's Opt-Ins (${optedInToday.length})</span>
+          <span class="text-xs font-bold text-blue-300 flex items-center space-x-1.5">
+            <span>👥</span>
+            <span>Student Attendance Opt-Ins (${studentOptIns.length})</span>
           </span>
           <button onclick="coordinatorApproveAllToday()" class="tap-scale px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
             ⚡ Approve All
@@ -2172,20 +2267,16 @@ function renderAdminUI() {
         </div>
       `;
 
-      optedInToday.forEach(item => {
+      studentOptIns.forEach(item => {
         const u = (STATE.adminUsers || []).find(usr => usr.id === item.user_id) || { name: 'Member', roll_no: '', role: 'student' };
-        const uRoleBadge = u.role === 'coordinator' 
-          ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Coordinator</span>' 
-          : '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">Normal User</span>';
-
         const card = document.createElement('div');
-        card.className = 'zentra-card p-3 rounded-2xl border border-amber-400/30 flex items-center justify-between space-x-2';
+        card.className = 'zentra-card p-3 rounded-2xl border border-white/10 flex items-center justify-between space-x-2';
         card.innerHTML = `
           <div class="truncate">
             <div class="flex items-center space-x-1.5">
               <span class="text-xs font-bold text-white truncate">${u.name}</span>
               ${u.roll_no ? `<span class="text-[10px] font-mono text-blue-300 font-bold">${u.roll_no}</span>` : ''}
-              ${uRoleBadge}
+              <span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">Normal User</span>
             </div>
             <p class="text-[10px] text-white/50 truncate">Opted in at ${formatTimeString(item.created_at)}</p>
           </div>
@@ -2198,9 +2289,9 @@ function renderAdminUI() {
             </button>
           </div>
         `;
-        optSec.appendChild(card);
+        studentAttSec.appendChild(card);
       });
-      wrapper.appendChild(optSec);
+      wrapper.appendChild(studentAttSec);
     }
 
     // 4. SECTION: PENDING CLUB MEMBERS
